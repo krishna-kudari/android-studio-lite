@@ -1,0 +1,228 @@
+{
+  "name": "android-studio-lite",
+  "displayName": "Android Studio Lite",
+  "description": "Android Dev Companion for Cursor/VS Code - Device management and app lifecycle controls",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "android-studio-lite",
+          "title": "Android Studio Lite",
+          "icon": "$(device-mobile)"
+        }
+      ]
+    },
+    "views": {
+      "android-studio-lite": [
+        {
+          "id": "androidDevices",
+          "name": "Android",
+          "when": "true"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "android-studio-lite.selectDevice",
+        "title": "Select Device",
+        "icon": "$(device-desktop)"
+      },
+      {
+        "command": "android-studio-lite.refreshDevices",
+        "title": "Refresh Devices",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "android-studio-lite.selectBuildVariant",
+        "title": "Select Build Variant",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "android-studio-lite.runApp",
+        "title": "Run App",
+        "icon": "$(play)"
+      },
+      {
+        "command": "android-studio-lite.stopApp",
+        "title": "Stop App",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "android-studio-lite.clearData",
+        "title": "Clear Data",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "android-studio-lite.uninstallApp",
+        "title": "Uninstall",
+        "icon": "$(trashcan)"
+      },
+      {
+        "command": "android-studio-lite.startLogcat",
+        "title": "Start Logcat",
+        "icon": "$(play)"
+      },
+      {
+        "command": "android-studio-lite.stopLogcat",
+        "title": "Stop Logcat",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "android-studio-lite.pauseLogcat",
+        "title": "Pause Logcat",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "android-studio-lite.resumeLogcat",
+        "title": "Resume Logcat",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "android-studio-lite.clearLogcat",
+        "title": "Clear Logcat",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "android-studio-lite.setLogLevel",
+        "title": "Set Log Level",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "android-studio-lite.startEmulator",
+        "title": "Start Emulator",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "android-studio-lite.selectEmulator",
+        "title": "Select Emulator",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "android-studio-lite.bootEmulator",
+        "title": "Boot Emulator",
+        "icon": "$(play)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "android-studio-lite.refreshDevices",
+          "when": "view == androidDevices",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "android-studio-lite.selectDevice",
+          "when": "view == androidDevices && viewItem == device-online",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "android-studio-lite.selectDevice",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.selectBuildVariant",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.runApp",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.stopApp",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.clearData",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.uninstallApp",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.startLogcat",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.stopLogcat",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.pauseLogcat",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.resumeLogcat",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.clearLogcat",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.setLogLevel",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.startEmulator",
+          "when": "true"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Android Studio Lite",
+      "properties": {
+        "android-studio-lite.adbPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to ADB executable. Leave empty to auto-detect."
+        },
+        "android-studio-lite.autoSelectDevice": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically select the first online device when available."
+        },
+        "android-studio-lite.devicePollInterval": {
+          "type": "number",
+          "default": 3000,
+          "description": "Device refresh interval in milliseconds (default: 3000ms)."
+        },
+        "android-studio-lite.logcatBufferSize": {
+          "type": "number",
+          "default": 10000,
+          "description": "Maximum number of log lines to buffer in memory (default: 10000)."
+        },
+        "android-studio-lite.emulatorPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to emulator executable. Leave empty to auto-detect."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  }
+}
