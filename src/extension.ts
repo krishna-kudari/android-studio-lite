@@ -53,9 +53,17 @@ export async function activate(context: vscode.ExtensionContext) {
     gradleService = new GradleService(context);
 
     // Initialize build variant service
-    buildVariantService = new BuildVariantService(context);
-    // Reload variants to ensure they're detected
-    buildVariantService.loadVariants();
+    buildVariantService = new BuildVariantService(context, gradleService);
+    
+    // Detect variants once during activation using Gradle init script
+    // This runs asynchronously and will update variants when complete
+    buildVariantService.detectVariants().catch(error => {
+        console.error('[Extension] Failed to detect build variants:', error);
+        vscode.window.showWarningMessage(
+            'Failed to detect Android build variants. Using defaults.',
+            'Dismiss'
+        );
+    });
 
     // Initialize app state service
     appStateService = new AppStateService();
@@ -131,8 +139,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const selectBuildVariantDisposable = vscode.commands.registerCommand(
         'android-studio-lite.selectBuildVariant',
         async () => {
-            // Reload variants before showing selector
-            buildVariantService.loadVariants();
+            // Reload variants before showing selector (forces re-detection)
+            await buildVariantService.reloadVariants();
             await selectBuildVariantCommand(buildVariantService);
             androidTreeProvider.refresh();
         }

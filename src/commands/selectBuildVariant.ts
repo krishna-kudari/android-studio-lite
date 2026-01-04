@@ -2,8 +2,11 @@ import * as vscode from 'vscode';
 import { BuildVariantService } from '../services/buildVariantService';
 
 export async function selectBuildVariantCommand(buildVariantService: BuildVariantService): Promise<void> {
-    // Reload variants in case build.gradle changed
-    buildVariantService.loadVariants();
+    // Reload variants in case build.gradle changed (already done in extension.ts, but keep for safety)
+    // Note: This is async but we don't await it - variants are loaded from cache immediately
+    buildVariantService.reloadVariants().catch(err => {
+        console.error('[selectBuildVariant] Failed to reload variants:', err);
+    });
     
     const variants = buildVariantService.getVariants();
     const selectedVariant = buildVariantService.getSelectedVariant();

@@ -1,30 +1,121 @@
 import * as vscode from 'vscode';
-import { detectBuildVariants, BuildVariant } from '../utils/gradleParser';
+import { BuildVariant } from '../utils/gradleParser';
+import { GradleService, AndroidVariantsModel } from './gradleService';
 
 export class BuildVariantService {
     private selectedVariant: BuildVariant | null = null;
     private variants: BuildVariant[] = [];
     private readonly STORAGE_KEY = 'selectedBuildVariant';
+    private readonly VARIANTS_CACHE_KEY = 'androidVariantsCache';
+    private readonly CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
-    constructor(private context: vscode.ExtensionContext) {
-        this.loadVariants();
+    constructor(
+        private context: vscode.ExtensionContext,
+        private gradleService: GradleService
+    ) {
+        this.loadVariantsFromCache();
         this.loadSelectedVariant();
     }
 
     /**
-     * Detect and load build variants from project
+     * Detect and load build variants from project using Gradle init script
+     * This should be called once during extension activation
      */
-    public loadVariants(): void {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            this.variants = [];
+    public async detectVariants(): Promise<void> {
+        console.log('[BuildVariantService] Detecting variants using Gradle init script...');
+        
+        const variantsData = await this.gradleService.detectBuildVariants();
+        
+        if (!variantsData) {
+            console.warn('[BuildVariantService] Failed to detect variants, using defaults');
+            this.variants = [
+                { name: 'debug', buildType: 'debug' },
+                { name: 'release', buildType: 'release' }
+            ];
             return;
         }
 
-        const workspaceRoot = workspaceFolders[0].uri.fsPath;
-        console.log(`[BuildVariantService] Loading variants from: ${workspaceRoot}`);
-        this.variants = detectBuildVariants(workspaceRoot);
-        console.log(`[BuildVariantService] Loaded ${this.variants.length} variants:`, this.variants.map(v => v.name).join(', '));
+        // Convert AndroidVariantsModel to BuildVariant[]
+        this.variants = this.convertToBuildVariants(variantsData);
+        
+        // Store in cache
+        this.saveVariantsToCache(variantsData);
+        
+        console.log(`[BuildVariantService] Detected ${this.variants.length} variants:`, this.variants.map(v => v.name).join(', '));
+        
+        // Reload selected variant after loading new variants
+        this.loadSelectedVariant();
+    }
+
+    /**
+     * Load variants from cache if available and not expired
+     */
+    private loadVariantsFromCache(): void {
+        const cached = this.context.workspaceState.get<{
+            data: AndroidVariantsModel;
+            timestamp: number;
+        }>(this.VARIANTS_CACHE_KEY);
+
+        if (cached && (Date.now() - cached.timestamp) < this.CACHE_EXPIRY_MS) {
+            console.log('[BuildVariantService] Loading variants from cache');
+            this.variants = this.convertToBuildVariants(cached.data);
+        } else {
+            // Use defaults until detection completes
+            this.variants = [
+                { name: 'debug', buildType: 'debug' },
+                { name: 'release', buildType: 'release' }
+            ];
+        }
+    }
+
+    /**
+     * Save variants to cache
+     */
+    private saveVariantsToCache(variantsData: AndroidVariantsModel): void {
+        this.context.workspaceState.update(this.VARIANTS_CACHE_KEY, {
+            data: variantsData,
+            timestamp: Date.now()
+        });
+    }
+
+    /**
+     * Convert AndroidVariantsModel to BuildVariant[]
+     */
+    private convertToBuildVariants(model: AndroidVariantsModel): BuildVariant[] {
+        const variants: BuildVariant[] = [];
+
+        for (const [modulePath, module] of Object.entries(model.modules)) {
+            // Only process application modules for now (can extend to libraries later)
+            if (module.type === 'application') {
+                for (const variant of module.variants) {
+                    // Combine flavors into a single flavor string (or use first flavor)
+                    const flavor = variant.flavors.length > 0 ? variant.flavors.join('') : undefined;
+                    
+                    variants.push({
+                        name: variant.name,
+                        buildType: variant.buildType,
+                        flavor: flavor
+                    });
+                }
+            }
+        }
+
+        // If no variants found, return defaults
+        if (variants.length === 0) {
+            return [
+                { name: 'debug', buildType: 'debug' },
+                { name: 'release', buildType: 'release' }
+            ];
+        }
+
+        return variants;
+    }
+
+    /**
+     * Reload variants (forces re-detection)
+     */
+    public async reloadVariants(): Promise<void> {
+        await this.detectVariants();
     }
 
     /**
@@ -84,6 +175,52 @@ export class BuildVariantService {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Get module information for a variant (if available)
+     */
+    public getVariantModule(variantName: string): string | null {
+        const cached = this.context.workspaceState.get<{
+            data: AndroidVariantsModel;
+            timestamp: number;
+        }>(this.VARIANTS_CACHE_KEY);
+
+        if (!cached) {
+            return null;
+        }
+
+        for (const [modulePath, module] of Object.entries(cached.data.modules)) {
+            const variant = module.variants.find(v => v.name === variantName);
+            if (variant) {
+                return modulePath;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get Gradle task name for a variant operation
+     */
+    public getVariantTask(variantName: string, operation: 'assemble' | 'install' | 'bundle'): string | null {
+        const cached = this.context.workspaceState.get<{
+            data: AndroidVariantsModel;
+            timestamp: number;
+        }>(this.VARIANTS_CACHE_KEY);
+
+        if (!cached) {
+            return null;
+        }
+
+        for (const module of Object.values(cached.data.modules)) {
+            const variant = module.variants.find(v => v.name === variantName);
+            if (variant && variant.tasks[operation]) {
+                return variant.tasks[operation];
+            }
+        }
+
+        return null;
     }
 }
 

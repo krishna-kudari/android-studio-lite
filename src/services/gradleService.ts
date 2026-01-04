@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { spawn, ChildProcess } from 'child_process';
 
 export interface GradleTask {
@@ -14,8 +15,10 @@ export class GradleService {
     private workspaceRoot: string | null = null;
     private currentProcess: ChildProcess | null = null;
     private isBuilding: boolean = false;
+    private extensionPath: string;
 
     constructor(private context: vscode.ExtensionContext) {
+        this.extensionPath = context.extensionPath;
         this.initializeGradleWrapper();
     }
 
@@ -247,5 +250,144 @@ export class GradleService {
 
         return apkPath || '';
     }
+
+    /**
+     * Detect Android build variants using Gradle init script
+     * Returns parsed variant data from all modules
+     */
+    public async detectBuildVariants(): Promise<AndroidVariantsModel | null> {
+        if (!this.isAvailable()) {
+            return null;
+        }
+
+        try {
+            // Read the init script content from extension directory
+            // .kts files are source files, so they're in src/ directory
+            const initScriptPath = path.join(
+                this.extensionPath,
+                'src',
+                'services',
+                'buildVariants',
+                'gradle',
+                'variant-init.gradle.kts'
+            );
+
+            if (!fs.existsSync(initScriptPath)) {
+                console.error(`[GradleService] Init script not found at: ${initScriptPath}`);
+                return null;
+            }
+
+            const initScriptContent = fs.readFileSync(initScriptPath, 'utf-8');
+
+            // Write to temp file
+            const tempDir = os.tmpdir();
+            const tempInitScript = path.join(tempDir, `android-variant-init-${Date.now()}.gradle.kts`);
+            fs.writeFileSync(tempInitScript, initScriptContent);
+
+            try {
+                // Execute Gradle with init script using spawn directly
+                const gradlew = this.getGradleWrapperPath();
+                const workspaceRoot = this.getWorkspaceRoot();
+                const isWindows = process.platform === 'win32';
+                const command = isWindows ? gradlew : './gradlew';
+                
+                // Use quiet mode and avoid build cache for faster execution
+                const args = [
+                    '-I', tempInitScript,
+                    'printAndroidVariants',
+                    '-q',
+                    '--no-build-cache'
+                ];
+
+                const result = await new Promise<{ success: boolean; output: string; error?: string }>((resolve, reject) => {
+                    let output = '';
+                    let errorOutput = '';
+
+                    const gradleProcess = spawn(command, args, {
+                        cwd: workspaceRoot,
+                        shell: isWindows
+                    });
+
+                    gradleProcess.stdout.on('data', (data) => {
+                        output += data.toString();
+                    });
+
+                    gradleProcess.stderr.on('data', (data) => {
+                        errorOutput += data.toString();
+                    });
+
+                    gradleProcess.on('close', (code) => {
+                        if (code === 0) {
+                            resolve({ success: true, output, error: errorOutput || undefined });
+                        } else {
+                            resolve({ success: false, output, error: errorOutput || 'Build failed' });
+                        }
+                    });
+
+                    gradleProcess.on('error', (error) => {
+                        reject(new Error(`Failed to execute Gradle: ${error.message}`));
+                    });
+                });
+
+                // Clean up temp file
+                try {
+                    fs.unlinkSync(tempInitScript);
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+
+                if (!result.success) {
+                    console.error(`[GradleService] Failed to detect variants: ${result.error}`);
+                    return null;
+                }
+
+                // Parse JSON output
+                const lines = result.output.split('\n');
+                const markerLine = lines.find(line => line.startsWith('ANDROID_VARIANTS='));
+                
+                if (!markerLine) {
+                    console.error('[GradleService] No ANDROID_VARIANTS marker found in output');
+                    return null;
+                }
+
+                const jsonStr = markerLine.replace('ANDROID_VARIANTS=', '').trim();
+                const variantsData = JSON.parse(jsonStr) as AndroidVariantsModel;
+                console.log('[GradleService] Detected build variants:', variantsData);
+                return variantsData;
+            } catch (error) {
+                // Clean up temp file on error
+                try {
+                    fs.unlinkSync(tempInitScript);
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+                throw error;
+            }
+        } catch (error) {
+            console.error('[GradleService] Error detecting build variants:', error);
+            return null;
+        }
+    }
+}
+
+/**
+ * Android Variants Model from Gradle init script
+ */
+export interface AndroidVariantsModel {
+    schemaVersion: number;
+    generatedAt: number;
+    modules: Record<string, {
+        type: 'application' | 'library';
+        variants: Array<{
+            name: string;
+            buildType: string;
+            flavors: string[];
+            tasks: {
+                assemble: string;
+                install?: string;
+                bundle?: string;
+            };
+        }>;
+    }>;
 }
 
