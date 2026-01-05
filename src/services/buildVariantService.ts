@@ -216,7 +216,7 @@ export class BuildVariantService {
         for (const module of Object.values(cached.data.modules)) {
             const variant = module.variants.find(v => v.name === variantName);
             if (variant && variant.tasks[operation]) {
-                return variant.tasks[operation];
+                return variant.tasks[operation] || null;
             }
         }
 
