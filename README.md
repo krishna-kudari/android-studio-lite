@@ -63,20 +63,117 @@
 3. Search for "Android Studio Lite"
 4. Click **Install**
 
-### First Time Setup
+## ⚙️ Setup
 
-1. **Configure ADB Path** (if not auto-detected):
+### For Users with Android Studio Installed
+
+If you already have Android Studio installed, minimal setup is required! 🎉
+
+#### Minimal Setup Steps
+
+1. **Set Android SDK Path** (Required)
+
+   The extension will automatically detect your SDK if you have `ANDROID_HOME` or `ANDROID_SDK_ROOT` environment variables set. If not, configure it:
+
+   **Option A: Set Environment Variable** (Recommended)
+
+   **macOS/Linux:**
+   ```bash
+   # Add to ~/.zshrc or ~/.bashrc
+   export ANDROID_HOME=$HOME/Library/Android/sdk
+   # or
+   export ANDROID_SDK_ROOT=$HOME/Library/Android/sdk
+   ```
+
+   **Windows:**
+   - Open System Properties → Environment Variables
+   - Add new variable: `ANDROID_HOME` = `C:\Users\<username>\AppData\Local\Android\Sdk`
+
+   **Option B: Configure in VS Code Settings**
    - Open Settings (`Cmd+,` / `Ctrl+,`)
-   - Search for "android-studio-lite.adbPath"
-   - Enter your ADB path (e.g., `/Users/username/Library/Android/sdk/platform-tools/adb`)
+   - Search for `android-studio-lite.sdkPath`
+   - Enter your SDK root path:
+     - **macOS**: `~/Library/Android/sdk`
+     - **Windows**: `C:\Users\<username>\AppData\Local\Android\Sdk`
+     - **Linux**: `~/Android/Sdk`
 
-2. **Configure Emulator Path** (optional):
-   - Search for "android-studio-lite.emulatorPath"
-   - Enter your emulator path if not auto-detected
+2. **Restart VS Code/Cursor**
 
-3. **Open an Android Project**:
+   After setting the environment variable, restart your editor to apply changes.
+
+3. **Done!** ✨
+
+   The extension will automatically detect:
+   - ✅ SDK Root Path
+   - ✅ Platform Tools (ADB)
+   - ✅ Build Tools
+   - ✅ Emulator (if installed)
+   - ✅ AVD Manager (if installed)
+   - ✅ AVD Home (defaults to `~/.android/avd`)
+
+#### What Gets Auto-Detected?
+
+Once the SDK path is configured, the extension automatically finds:
+- **ADB**: `{sdkPath}/platform-tools/adb`
+- **Emulator**: `{sdkPath}/emulator/emulator`
+- **AVD Manager**: `{sdkPath}/cmdline-tools/latest/bin/avdmanager`
+- **AVD Home**: Uses system default (`~/.android/avd` on macOS/Linux, `%USERPROFILE%\.android\avd` on Windows)
+
+#### If Something Isn't Detected
+
+If the extension prompts you during startup:
+- **SDK Root Path**: Click "Update SDK Root Path" and select your SDK directory
+- **AVD Manager**: Usually auto-detected, but you can manually set `android-studio-lite.executable`
+- **Emulator**: Usually auto-detected, but you can manually set `android-studio-lite.emulatorPath`
+
+### For Users Without Android Studio
+
+If you don't have Android Studio installed, you'll need to set up the Android SDK manually:
+
+#### Requirements
+- JDK 8 or higher (Oracle JDK or OpenJDK)
+
+#### Setup Steps
+
+1. **Download Android SDK Command Line Tools**
+   - Visit: https://developer.android.com/studio#command-line-tools-only
+   - Download the command-line tools for your platform
+
+2. **Extract and Set Up SDK**
+   ```bash
+   # Create SDK directory
+   mkdir -p ~/android-sdk/cmdline-tools
+
+   # Extract downloaded tools
+   # Rename extracted folder to "latest"
+   # Move to ~/android-sdk/cmdline-tools/latest
+   ```
+
+3. **Install SDK Components**
+   ```bash
+   export ANDROID_HOME=$HOME/android-sdk
+   export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+
+   # Accept licenses
+   yes | sdkmanager --licenses
+
+   # Install essential components
+   sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "emulator"
+   ```
+
+4. **Configure Extension**
+   - Set `ANDROID_HOME` environment variable, or
+   - Configure `android-studio-lite.sdkPath` in VS Code settings
+
+### First Time Setup (After Installation)
+
+1. **Open an Android Project**:
    - Open a folder containing an Android project
    - The extension will automatically detect build variants
+
+2. **Verify Setup**:
+   - Check the Output panel for "Android Studio Lite" to see configuration status
+   - All paths should show "check OK 👍" if properly configured
 
 ---
 
@@ -142,21 +239,42 @@
 
 All commands are accessible via Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
-| Command | Description |
-|---------|-------------|
-| `Android Studio Lite: Select Device` | Choose target device |
+### Setup Commands
+
+| Command                                        | Description                           |
+| ---------------------------------------------- | ------------------------------------- |
+| `Android Studio Lite: Update SDK Root Path`    | Configure Android SDK Root Path       |
+| `Android Studio Lite: Update AVD Manager Path` | Configure AVD Manager executable path |
+| `Android Studio Lite: Update Emulator Path`    | Configure Emulator executable path    |
+
+### Device & Emulator Commands
+
+| Command                                | Description                  |
+| -------------------------------------- | ---------------------------- |
+| `Android Studio Lite: Select Device`   | Choose target device         |
 | `Android Studio Lite: Refresh Devices` | Manually refresh device list |
+| `Android Studio Lite: Start Emulator`  | Launch an emulator           |
+| `Android Studio Lite: Select Emulator` | Select an emulator to use    |
+
+### Build & App Commands
+
+| Command                                     | Description                |
+| ------------------------------------------- | -------------------------- |
 | `Android Studio Lite: Select Build Variant` | Choose build configuration |
-| `Android Studio Lite: Run App` | Build and launch app |
-| `Android Studio Lite: Stop App` | Force stop running app |
-| `Android Studio Lite: Uninstall` | Remove app from device |
-| `Android Studio Lite: Clear Data` | Clear app data |
-| `Android Studio Lite: Start Emulator` | Launch an emulator |
-| `Android Studio Lite: Start Logcat` | Begin log streaming |
-| `Android Studio Lite: Stop Logcat` | Stop log streaming |
-| `Android Studio Lite: Pause Logcat` | Pause log streaming |
+| `Android Studio Lite: Run App`              | Build and launch app       |
+| `Android Studio Lite: Stop App`             | Force stop running app     |
+| `Android Studio Lite: Uninstall`            | Remove app from device     |
+| `Android Studio Lite: Clear Data`           | Clear app data             |
+
+### Logcat Commands
+
+| Command                              | Description          |
+| ------------------------------------ | -------------------- |
+| `Android Studio Lite: Start Logcat`  | Begin log streaming  |
+| `Android Studio Lite: Stop Logcat`   | Stop log streaming   |
+| `Android Studio Lite: Pause Logcat`  | Pause log streaming  |
 | `Android Studio Lite: Resume Logcat` | Resume log streaming |
-| `Android Studio Lite: Clear Logcat` | Clear log buffer |
+| `Android Studio Lite: Clear Logcat`  | Clear log buffer     |
 | `Android Studio Lite: Set Log Level` | Filter logs by level |
 
 ---
@@ -167,20 +285,36 @@ All commands are accessible via Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
 
 Access via `File > Preferences > Settings` (or `Cmd+,` / `Ctrl+,`):
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `android-studio-lite.adbPath` | string | `""` | Custom ADB executable path |
-| `android-studio-lite.emulatorPath` | string | `""` | Custom emulator executable path |
-| `android-studio-lite.autoSelectDevice` | boolean | `false` | Auto-select first online device |
-| `android-studio-lite.devicePollInterval` | number | `3000` | Device refresh interval (ms) |
-| `android-studio-lite.logcatBufferSize` | number | `10000` | Max log lines in buffer |
+#### Required Settings
+
+| Setting                       | Type   | Default | Description                                                                                     |
+| ----------------------------- | ------ | ------- | ----------------------------------------------------------------------------------------------- |
+| `android-studio-lite.sdkPath` | string | `""`    | Android SDK Root Path. If blank, uses `ANDROID_HOME` or `ANDROID_SDK_ROOT` environment variable |
+
+#### Optional Settings
+
+| Setting                                  | Type    | Default        | Description                                                                                                                      |
+| ---------------------------------------- | ------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `android-studio-lite.avdHome`            | string  | `""`           | Android AVD Home Path. If blank, uses `ANDROID_AVD_HOME` or system default (`~/.android/avd`)                                    |
+| `android-studio-lite.adbPath`            | string  | `""`           | Custom ADB executable path. Auto-detected from SDK if not set                                                                    |
+| `android-studio-lite.emulatorPath`       | string  | `""`           | Custom emulator executable path. Auto-detected from SDK if not set                                                               |
+| `android-studio-lite.executable`         | string  | `"avdmanager"` | AVD Manager executable path. Auto-detected from SDK if not set                                                                   |
+| `android-studio-lite.sdkManager`         | string  | `"sdkmanager"` | SDK Manager executable path. Auto-detected from SDK if not set                                                                   |
+| `android-studio-lite.cmdVersion`         | string  | `"latest"`     | Android SDK Command-Line Tools version                                                                                           |
+| `android-studio-lite.emulatorOpt`        | string  | `""`           | Additional emulator options (see [emulator command-line options](https://developer.android.com/studio/run/emulator-commandline)) |
+| `android-studio-lite.autoSelectDevice`   | boolean | `false`        | Auto-select first online device                                                                                                  |
+| `android-studio-lite.devicePollInterval` | number  | `3000`         | Device refresh interval (ms)                                                                                                     |
+| `android-studio-lite.logcatBufferSize`   | number  | `10000`        | Max log lines in buffer                                                                                                          |
 
 ### Environment Variables
 
-The extension automatically checks these environment variables:
+The extension automatically checks these environment variables (in order of priority):
 
-- `ANDROID_HOME` - Android SDK location
-- `ANDROID_SDK_ROOT` - Alternative SDK location
+1. `ANDROID_HOME` - Android SDK location (takes precedence)
+2. `ANDROID_SDK_ROOT` - Alternative SDK location
+3. `ANDROID_AVD_HOME` - AVD Home location (optional, defaults to `~/.android/avd`)
+
+**Note:** After updating the SDK Path, the extension will auto-detect all executable paths from the SDK.
 
 ---
 
