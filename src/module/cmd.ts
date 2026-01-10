@@ -3,10 +3,15 @@ import { showMsg, MsgType } from "./ui";
 import { window, ProgressLocation, Terminal } from 'vscode';
 import { Manager } from "../core";
 
-export const exec = async function (manager: Manager, command: string, willLoad: Function, didLoad: Function) {
+export const exec = async function (manager: Manager, command: string, willLoad: Function, didLoad: Function, cwd?: string) {
     willLoad();
 
-    child_process.exec(command, (error, stdout, stderr) => {
+    const options: child_process.ExecOptions = {};
+    if (cwd) {
+        options.cwd = cwd;
+    }
+
+    child_process.exec(command, options, (error, stdout, stderr) => {
         didLoad(error, stdout, stderr);
     });
 };
@@ -33,18 +38,22 @@ export const sendTerm = function (term: Terminal, ...msg: string[]) {
     });
 };
 
-export const spawn = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string) {
+export const spawn = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
 
     console.log("CMD Spawn");
     if (showLog) { manager.output.appendTime(); }
 
     if (willLoadMsg && willLoadMsg !== "") { showMsg(MsgType.info, willLoadMsg); };
     return new Promise((resolve, reject) => {
-        let child = child_process.spawn(command, { shell: true });
+        const spawnOptions: child_process.SpawnOptions = { shell: true };
+        if (cwd) {
+            spawnOptions.cwd = cwd;
+        }
+        let child = child_process.spawn(command, spawnOptions);
 
         let stdout = new StrBuffer();
         let stderr = new StrBuffer();
-        if ("on" in child.stdout) {
+        if (child.stdout && "on" in child.stdout) {
             child.stdout.on('data', (data) => {
                 let buf = Buffer.from(data).toString();
                 if (buf === "") {
@@ -63,7 +72,7 @@ export const spawn = async function (manager: Manager, showLog: boolean, command
                 }
             });
         }
-        if ("on" in child.stderr) {
+        if (child.stderr && "on" in child.stderr) {
             child.stderr.on('data', (data) => {
                 let buf = Buffer.from(data).toString();
                 if (buf === "") {
@@ -109,14 +118,18 @@ export const spawn = async function (manager: Manager, showLog: boolean, command
     });
 };
 
-export const spawnSync = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string) {
+export const spawnSync = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
     const { spawnSync } = require("child_process");
     console.log("CMD SpawnSync");
     if (showLog) { manager.output.appendTime(); }
 
     if (willLoadMsg && willLoadMsg !== "") { showMsg(MsgType.info, willLoadMsg); };
     return new Promise((resolve, reject) => {
-        let result = spawnSync(command, { shell: false });
+        const spawnOptions: any = { shell: false };
+        if (cwd) {
+            spawnOptions.cwd = cwd;
+        }
+        let result = spawnSync(command, spawnOptions);
 
         console.log("CMD SpawnSync - end");
         console.log(result);
@@ -145,7 +158,7 @@ export const spawnSync = async function (manager: Manager, showLog: boolean, com
     });
 };
 
-export const execWithMsg = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string) {
+export const execWithMsg = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
     console.log("CMD MSG");
     return new Promise((resolve, reject) => {
         exec(manager, command,
@@ -163,11 +176,11 @@ export const execWithMsg = async function (manager: Manager, showLog: boolean, c
                 if (showLog) { manager.output.append(stdout); }
                 if (success && success !== "") { showMsg(MsgType.info, success); }
                 setTimeout(() => { resolve(stdout); }, success ? 1500 : 0);
-            });
+            }, cwd);
     });
 };
 
-export const execWithProgress = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string) {
+export const execWithProgress = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
     console.log("CMD Progress");
     return window.withProgress(
         { location: ProgressLocation.Notification, },
@@ -196,7 +209,7 @@ export const execWithProgress = async function (manager: Manager, showLog: boole
                     setTimeout(() => { resolve(stdout); }, success ? 1500 : 0);
                 }
             };
-            return exec(manager, command, options.willLoad, options.didLoad);
+            return exec(manager, command, options.willLoad, options.didLoad, cwd);
         })
     );
 };

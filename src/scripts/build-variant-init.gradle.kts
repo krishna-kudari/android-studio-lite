@@ -1,3 +1,86 @@
+/**
+ * This is a Gradle init script that is used to print the Android variants to the console.
+ * format:
+ * ```
+ * ANDROID_BUILD_VARIANTS_PROTOCOL={
+ *   "schemaVersion": 1,
+ *   "generatedAt": 1768035436814,
+ *   "modules": {
+ *     ":app": {
+ *       "type": "application",
+ *       "variants": [
+ *         {
+ *           "name": "productionDebug",
+ *           "buildType": "debug",
+ *           "flavors": [
+ *             "production"
+ *           ],
+ *           "tasks": {
+ *             "assemble": "assembleProductionDebug",
+ *             "install": "installProductionDebug"
+ *           }
+ *         },
+ *         {
+ *           "name": "preproductionDebug",
+ *           "buildType": "debug",
+ *           "flavors": [
+ *             "preproduction"
+ *           ],
+ *           "tasks": {
+ *             "assemble": "assemblePreproductionDebug",
+ *             "install": "installPreproductionDebug"
+ *           }
+ *         },
+ *         {
+ *           "name": "stagingDebug",
+ *           "buildType": "debug",
+ *           "flavors": [
+ *             "staging"
+ *           ],
+ *           "tasks": {
+ *             "assemble": "assembleStagingDebug",
+ *             "install": "installStagingDebug"
+ *           }
+ *         },
+ *         {
+ *           "name": "productionRelease",
+ *           "buildType": "release",
+ *           "flavors": [
+ *             "production"
+ *           ],
+ *           "tasks": {
+ *             "assemble": "assembleProductionRelease",
+ *             "bundle": "bundleProductionRelease"
+ *           }
+ *         },
+ *         {
+ *           "name": "preproductionRelease",
+ *           "buildType": "release",
+ *           "flavors": [
+ *             "preproduction"
+ *           ],
+ *           "tasks": {
+ *             "assemble": "assemblePreproductionRelease",
+ *             "bundle": "bundlePreproductionRelease"
+ *           }
+ *         },
+ *         {
+ *           "name": "stagingRelease",
+ *           "buildType": "release",
+ *           "flavors": [
+ *             "staging"
+ *           ],
+ *           "tasks": {
+ *             "assemble": "assembleStagingRelease",
+ *             "bundle": "bundleStagingRelease"
+ *           }
+ *         }
+ *       ]
+ *     }
+ *   }
+ * }
+ * ```
+ */
 gradle.rootProject {
 
     tasks.create("printAndroidVariants") {
@@ -123,7 +206,7 @@ gradle.rootProject {
                     else -> "\"$value\""
                 }
 
-            println("ANDROID_VARIANTS=${toJson(result)}")
+            println("ANDROID_BUILD_VARIANTS_PROTOCOL=${toJson(result)}")
         }
     }
 }

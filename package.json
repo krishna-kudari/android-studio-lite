@@ -12,6 +12,7 @@
   "activationEvents": [
     "onStartupFinished",
     "onView:android-studio-lite-avd",
+    "onView:android-studio-lite-build-variant",
     "onCommand:android-studio-lite.avdlist-refresh",
     "onCommand:android-studio-lite.setup-sdkpath",
     "onCommand:android-studio-lite.setup-avdmanager",
