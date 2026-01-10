@@ -10,7 +10,12 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:android-studio-lite-avd",
+    "onCommand:android-studio-lite.avdlist-refresh",
+    "onCommand:android-studio-lite.setup-sdkpath",
+    "onCommand:android-studio-lite.setup-avdmanager",
+    "onCommand:android-studio-lite.setup-emulator"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -26,23 +31,20 @@
     "views": {
       "android-studio-lite": [
         {
-          "id": "androidDevices",
-          "name": "Android",
+          "id": "android-studio-lite-avd",
+          "name": "Android Virtual Device",
+          "contextualTitle": "AVD Manager - Android Virtual Device",
+          "when": "true"
+        },
+        {
+          "id": "android-studio-lite-build-variant",
+          "name": "Build Variant",
+          "contextualTitle": "Build Variant",
           "when": "true"
         }
       ]
     },
     "commands": [
-      {
-        "command": "android-studio-lite.selectDevice",
-        "title": "Select Device",
-        "icon": "$(device-desktop)"
-      },
-      {
-        "command": "android-studio-lite.refreshDevices",
-        "title": "Refresh Devices",
-        "icon": "$(refresh)"
-      },
       {
         "command": "android-studio-lite.selectBuildVariant",
         "title": "Select Build Variant",
@@ -112,28 +114,115 @@
         "command": "android-studio-lite.bootEmulator",
         "title": "Boot Emulator",
         "icon": "$(play)"
+      },
+      {
+        "command": "android-studio-lite.avdlist-refresh",
+        "title": "Refresh AVD List",
+        "shortTitle": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "android-studio-lite.avd-create",
+        "title": "Create",
+        "icon": "$(plus)"
+      },
+      {
+        "command": "android-studio-lite.avd-launch",
+        "title": "Launch",
+        "icon": "$(run)"
+      },
+      {
+        "command": "android-studio-lite.avd-edit",
+        "title": "Edit",
+        "icon": "$(notebook-edit)"
+      },
+      {
+        "command": "android-studio-lite.avd-showdir",
+        "title": "Open AVD folder",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "android-studio-lite.avd-showconfigfile",
+        "title": "Open AVD config.ini",
+        "icon": "$(preferences-open-settings)"
+      },
+      {
+        "command": "android-studio-lite.avd-delete",
+        "title": "Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "android-studio-lite.setup-sdkpath",
+        "title": "Update SDK Root Path",
+        "category": "Android Studio Lite"
+      },
+      {
+        "command": "android-studio-lite.setup-avdmanager",
+        "title": "Update AVD Manager Path",
+        "category": "Android Studio Lite"
+      },
+      {
+        "command": "android-studio-lite.setup-emulator",
+        "title": "Update Emulator Path",
+        "category": "Android Studio Lite"
+      },
+      {
+        "command": "android-studio-lite.avd-select",
+        "title": "Select Emulator",
+        "icon": "$(check)"
+      },
+      {
+        "command": "android-studio-lite.buildvariant-select",
+        "title": "Select Build Variant",
+        "icon": "$(check)"
+      },
+      {
+        "command": "android-studio-lite.buildvariant-refresh",
+        "title": "Refresh Build Variants",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "android-studio-lite.refreshDevices",
-          "when": "view == androidDevices",
-          "group": "navigation"
+          "command": "android-studio-lite.avdlist-refresh",
+          "when": "view == android-studio-lite-avd",
+          "group": "navigation@2"
+        },
+        {
+          "command": "android-studio-lite.buildvariant-refresh",
+          "when": "view == android-studio-lite-build-variant",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
         {
-          "command": "android-studio-lite.selectDevice",
-          "when": "view == androidDevices && viewItem == device-online",
-          "group": "inline"
+          "command": "android-studio-lite.avd-launch",
+          "when": "view == android-studio-lite-avd && viewItem == avd",
+          "group": "inline@1"
+        },
+        {
+          "command": "android-studio-lite.avd-edit",
+          "when": "view == android-studio-lite-avd && viewItem == avd",
+          "group": "inline@2"
+        },
+        {
+          "command": "android-studio-lite.avd-showconfigfile",
+          "when": "view == android-studio-lite-avd",
+          "group": "inline@3"
+        },
+        {
+          "command": "android-studio-lite.avd-showdir",
+          "when": "view == android-studio-lite-avd",
+          "group": "inline@4"
+        },
+        {
+          "command": "android-studio-lite.avd-delete",
+          "when": "view == android-studio-lite-avd && viewItem == avd",
+          "group": "avd-menu@3"
         }
       ],
       "commandPalette": [
-        {
-          "command": "android-studio-lite.selectDevice",
-          "when": "true"
-        },
         {
           "command": "android-studio-lite.selectBuildVariant",
           "when": "true"
@@ -181,6 +270,58 @@
         {
           "command": "android-studio-lite.startEmulator",
           "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avdlist-refresh",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-create",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-launch",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-edit",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-showdir",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-showconfigfile",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-delete",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.setup-sdkpath",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.setup-avdmanager",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.setup-emulator",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.avd-select",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.buildvariant-select",
+          "when": "true"
+        },
+        {
+          "command": "android-studio-lite.buildvariant-refresh",
+          "when": "true"
         }
       ]
     },
@@ -211,6 +352,42 @@
           "type": "string",
           "default": "",
           "description": "Custom path to emulator executable. Leave empty to auto-detect."
+        },
+        "android-studio-lite.sdkPath": {
+          "title": "Android SDK Root Path",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "The location of the Android SDK Root Path. If blank, it will attempt to find it from the `ANDROID_SDK_ROOT` or `ANDROID_HOME` environment variable."
+        },
+        "android-studio-lite.avdHome": {
+          "title": "Android AVD Home Path",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "The location of the Android AVD Home Path. If blank, it will attempt to find it from the `ANDROID_AVD_HOME` environment variable or SDK Default."
+        },
+        "android-studio-lite.cmdVersion": {
+          "title": "Android Command-Line Tools Version",
+          "type": "string",
+          "default": "latest",
+          "description": "Android SDK Command-Line Tools Version"
+        },
+        "android-studio-lite.executable": {
+          "title": "AVD Manager executable (optional)",
+          "type": "string",
+          "default": "avdmanager",
+          "description": "AVD Manager executable path"
+        },
+        "android-studio-lite.sdkManager": {
+          "title": "Android SDK Manager executable (optional)",
+          "type": "string",
+          "default": "sdkmanager",
+          "description": "Android SDK Manager executable path"
+        },
+        "android-studio-lite.emulatorOpt": {
+          "title": "Android emulator options (optional)",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Android emulator options. [Start the emulator from the command line](https://developer.android.com/studio/run/emulator-commandline)"
         }
       }
     }
