@@ -12,6 +12,8 @@ import { AVDDeviceQuickPickItem } from './AVDDeviceQuickPick';
 
 export class AVDTreeView {
     readonly provider: AVDTreeDataProvider;
+    private _dropdownProvider?: { refresh: () => void };
+
     constructor(context: vscode.ExtensionContext, private manager: Manager) {
         this.provider = new AVDTreeDataProvider(this.manager);
 
@@ -66,7 +68,18 @@ export class AVDTreeView {
         vscode.window.createWebviewPanel('android-studio-lite-avdCreate', "Create New AVD", vscode.ViewColumn.Beside);
     };
 
-    refresh = async () => this.manager.avd.getAVDList(true).then(() => this.provider.refresh());
+    refresh = async () => {
+        await this.manager.avd.getAVDList(true);
+        this.provider.refresh();
+        // Notify dropdown provider to refresh
+        if (this._dropdownProvider) {
+            await this._dropdownProvider.refresh();
+        }
+    };
+
+    setDropdownProvider(provider: { refresh: () => void }) {
+        this._dropdownProvider = provider;
+    }
 
     async getAVDQuickPickItems(): Promise<AVDQuickPickItem[] | undefined> {
         return this.manager.avd.getAVDList()

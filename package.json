@@ -11,6 +11,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
+    "onView:android-studio-lite-avd-dropdown",
     "onView:android-studio-lite-avd",
     "onView:android-studio-lite-build-variant",
     "onCommand:android-studio-lite.avdlist-refresh",
@@ -31,6 +32,12 @@
     },
     "views": {
       "android-studio-lite": [
+        {
+          "id": "android-studio-lite-avd-dropdown",
+          "name": "AVD Selector",
+          "type": "webview",
+          "when": "true"
+        },
         {
           "id": "android-studio-lite-avd",
           "name": "Android Virtual Device",
@@ -181,6 +188,11 @@
         "command": "android-studio-lite.buildvariant-refresh",
         "title": "Refresh Build Variants",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "android-studio-lite.showExampleWebview",
+        "title": "Show Example Webview",
+        "icon": "$(browser)"
       }
     ],
     "menus": {
@@ -395,12 +407,34 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "compile": "npm run compile:extension && npm run compile:webviews",
+    "compile:extension": "tsc -p ./",
+    "compile:webviews": "webpack --mode production",
+    "watch": "npm run watch:extension & npm run watch:webviews",
+    "watch:extension": "tsc -watch -p ./",
+    "watch:webviews": "webpack --mode development --watch",
+    "build": "npm run compile",
+    "build:quick": "webpack --mode production --env quick=true"
+  },
+  "dependencies": {
+    "lit": "^3.3.2",
+    "@lit/context": "^1.1.2"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "16.x",
-    "typescript": "^4.9.4"
+    "typescript": "^5.0.0",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4",
+    "ts-loader": "^9.5.1",
+    "esbuild-loader": "^4.1.1",
+    "html-webpack-plugin": "^5.6.0",
+    "mini-css-extract-plugin": "^2.9.0",
+    "css-loader": "^7.1.2",
+    "sass": "^1.80.0",
+    "sass-loader": "^16.0.2",
+    "css-minimizer-webpack-plugin": "^7.0.0",
+    "terser-webpack-plugin": "^5.3.10",
+    "copy-webpack-plugin": "^12.0.2"
   }
 }

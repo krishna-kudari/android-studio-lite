@@ -1,0 +1,469 @@
+# Android Studio Lite - Codebase Documentation
+
+## Project Overview
+
+**Android Studio Lite** is a VS Code extension that provides Android development tooling including:
+- Android Virtual Device (AVD) management
+- Build variant selection
+- Device management and app lifecycle controls
+- Logcat integration
+
+## Tech Stack
+
+### Core Technologies
+- **TypeScript** - Primary language (ES2020 target)
+- **VS Code Extension API** - Extension host runtime
+- **Node.js** - Runtime environment
+
+### Webview Technologies
+- **Lit Elements** (v3.3.2) - Web Components framework for webviews
+- **@lit/context** (v1.1.2) - Dependency injection via Context API
+- **Webpack** (v5.95.0) - Module bundler for webviews
+- **esbuild-loader** - Fast TypeScript/JSX transpilation
+- **SCSS** - CSS preprocessing (via sass-loader)
+
+### Build Tools
+- **TypeScript Compiler** - Extension code compilation
+- **Webpack** - Webview bundling with ES modules output
+- **MiniCssExtractPlugin** - CSS extraction
+- **TerserPlugin** - JavaScript minification (production)
+
+## Project Structure
+
+```
+android-studio-lite/
+├── src/
+│   ├── cmd/                    # Command implementations
+│   │   ├── AVDManager.ts       # AVD management commands
+│   │   ├── BuildVariant.ts     # Build variant commands
+│   │   ├── Emulator.ts         # Emulator commands
+│   │   └── Executable.ts       # Executable utilities
+│   ├── core.ts                 # Core singleton manager
+│   ├── extension.ts            # Extension entry point
+│   ├── module/                 # Module utilities
+│   │   ├── cache.ts
+│   │   ├── cmd.ts
+│   │   ├── platform.ts
+│   │   └── ui.ts
+│   ├── service/                # Service layer
+│   │   ├── AndroidService.ts
+│   │   ├── AVDService.ts
+│   │   ├── BuildVariantService.ts
+│   │   └── Service.ts
+│   ├── ui/                     # UI providers (TreeViews, Webviews)
+│   │   ├── AVDTreeView.ts
+│   │   ├── AVDDropdownView.ts
+│   │   ├── BuildVariantTreeView.ts
+│   │   └── webview-html.ts
+│   ├── utils/                  # Utility functions
+│   │   └── logcatParser.ts
+│   └── webviews/               # Webview architecture
+│       ├── apps/               # Webview applications
+│       │   ├── example/        # Example webview
+│       │   │   ├── example.ts
+│       │   │   ├── example.html
+│       │   │   └── components/
+│       │   └── shared/         # Shared components
+│       │       └── components/
+│       │           ├── button.ts
+│       │           ├── element.ts
+│       │           └── styles/
+│       │               └── base.css.ts
+│       ├── protocol.ts         # IPC protocol definitions
+│       ├── webviewController.ts    # Per-instance controller
+│       ├── webviewDescriptors.ts   # Webview type definitions
+│       ├── webviewProvider.ts      # Provider interface
+│       ├── webviewsController.ts   # Main webview manager
+│       └── exampleProvider.ts      # Example provider implementation
+├── assets/                     # Extension assets
+├── dist/                       # Build output
+│   ├── webviews/              # Bundled webviews
+│   └── ...
+├── out/                        # Compiled TypeScript
+├── webpack.config.mjs          # Webpack configuration
+├── tsconfig.json              # TypeScript config (extension)
+└── package.json
+```
+
+## Webview Architecture
+
+### Architecture Overview
+
+The webview system follows a layered architecture inspired by GitLens:
+
+```
+VS Code Extension Host
+    ↓
+WebviewsController (manages all webviews)
+    ↓
+WebviewController (per-instance controller)
+    ↓
+WebviewProvider (business logic)
+    ↓
+Webview HTML/JS (Lit Elements)
+```
+
+### Core Components
+
+#### 1. WebviewsController (`src/webviews/webviewsController.ts`)
+- Main entry point for webview management
+- Registers and manages webview panels
+- Handles webview lifecycle (creation, disposal, serialization)
+- Provides `registerWebviewPanel()` method for registering new webviews
+
+#### 2. WebviewController (`src/webviews/webviewController.ts`)
+- Per-instance controller for individual webview panels
+- Manages webview lifecycle (show, refresh, dispose)
+- Handles IPC communication between extension host and webview
+- Generates HTML with token replacement
+- Waits for provider initialization before accessing methods
+
+#### 3. WebviewProvider (`src/webviews/webviewProvider.ts`)
+- Interface for webview business logic
+- Provides bootstrap data, HTML injection points
+- Handles lifecycle callbacks (onReady, onRefresh, etc.)
+- Manages state and IPC message handling
+
+#### 4. WebviewDescriptors (`src/webviews/webviewDescriptors.ts`)
+- Type definitions for webview panels and views
+- Defines webview metadata (id, title, icon, options)
+
+#### 5. Protocol (`src/webviews/protocol.ts`)
+- IPC protocol definitions
+- Message types and interfaces
+
+### Component Structure
+
+#### Base Element (`src/webviews/apps/shared/components/element.ts`)
+- Extends Lit's `LitElement`
+- Provides `emit()` method for custom events
+- Base class for all webview components
+
+#### Button Component (`src/webviews/apps/shared/components/button.ts`)
+- Example Lit component with CSS-in-TypeScript
+- Supports variants: `primary`, `secondary`, `icon`
+- Emits `button-click` events
+- Uses VS Code theme CSS variables
+
+### Styling Approach
+
+**CSS-in-TypeScript** using Lit's `css` template tag:
+
+```typescript
+import { css } from 'lit';
+
+export const myStyles = css`
+	:host {
+		display: block;
+		color: var(--vscode-foreground);
+		background-color: var(--vscode-editor-background);
+	}
+`;
+```
+
+**VS Code Theme Integration:**
+- Uses CSS custom properties from VS Code theme
+- Automatically adapts to light/dark/high-contrast themes
+- Common variables:
+  - `--vscode-foreground`
+  - `--vscode-background`
+  - `--vscode-button-background`
+  - `--vscode-button-foreground`
+  - `--vscode-input-background`
+  - `--vscode-input-border`
+  - `--vscode-font-family`
+  - `--vscode-font-size`
+
+### Creating a New Webview
+
+1. **Create webview app** (`src/webviews/apps/mywebview/mywebview.ts`):
+```typescript
+import { html, css } from 'lit';
+import { customElement } from 'lit/decorators.js';
+import { GlElement } from '../shared/components/element.js';
+
+@customElement('gl-my-webview')
+export class GlMyWebview extends GlElement {
+	static override styles = [
+		css`
+			:host {
+				display: block;
+				padding: 1rem;
+			}
+		`,
+	];
+
+	override render() {
+		return html`<div>My Webview Content</div>`;
+	}
+}
+```
+
+2. **Create HTML template** (`src/webviews/apps/mywebview/mywebview.html`):
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>My Webview</title>
+	#{head}
+</head>
+<body>
+	<script type="module" nonce="#{cspNonce}">
+		import './mywebview.js';
+	</script>
+	#{body}
+	#{endOfBody}
+</body>
+</html>
+```
+
+3. **Create provider** (`src/webviews/mywebviewProvider.ts`):
+```typescript
+import type { WebviewProvider, WebviewHost } from './webviewProvider.js';
+import type { WebviewState } from './protocol.js';
+import { Disposable } from 'vscode';
+
+export class MyWebviewProvider implements WebviewProvider<WebviewState> {
+	constructor(private readonly host: WebviewHost) {}
+
+	getTelemetryContext() {
+		return { 'webview.id': this.host.id };
+	}
+
+	includeBootstrap(): WebviewState {
+		return this.host.baseWebviewState;
+	}
+
+	onReady(): void {
+		console.log('Webview ready');
+	}
+
+	dispose(): void {}
+}
+```
+
+4. **Register in extension** (`src/extension.ts`):
+```typescript
+import { WebviewsController } from './webviews/webviewsController';
+import { MyWebviewProvider } from './webviews/mywebviewProvider';
+
+const webviewsController = new WebviewsController(context);
+const myWebview = webviewsController.registerWebviewPanel(
+	{
+		id: 'android-studio-lite.mywebview',
+		fileName: 'mywebview.html',
+		iconPath: 'assets/icon.png',
+		title: 'My Webview',
+		contextKeyPrefix: 'android-studio-lite:webview:mywebview',
+	},
+	async (host) => new MyWebviewProvider(host),
+);
+
+// Register command to show webview
+vscode.commands.registerCommand('android-studio-lite.showMyWebview', async () => {
+	await myWebview.show();
+});
+```
+
+5. **Add webpack entry** (`webpack.config.mjs`):
+```javascript
+entry: {
+	example: './example/example.ts',
+	mywebview: './mywebview/mywebview.ts', // Add this
+},
+```
+
+6. **Add HTML plugin** (`webpack.config.mjs`):
+```javascript
+plugins: [
+	// ... existing plugins
+	new HtmlPlugin({
+		template: path.join(basePath, 'mywebview', 'mywebview.html'),
+		chunks: ['mywebview'],
+		filename: path.join(__dirname, 'dist', 'webviews', 'mywebview.html'),
+		// ... other options
+	}),
+],
+```
+
+## Build System
+
+### Build Commands
+
+```bash
+# Build everything
+npm run compile
+
+# Build extension only
+npm run compile:extension
+
+# Build webviews only
+npm run compile:webviews
+
+# Watch mode (extension)
+npm run watch:extension
+
+# Watch mode (webviews)
+npm run watch:webviews
+
+# Watch both
+npm run watch
+```
+
+### Webpack Configuration
+
+**Location:** `webpack.config.mjs`
+
+**Key Features:**
+- ES modules output (`libraryTarget: 'module'`)
+- SCSS → CSS extraction
+- Source maps in development
+- Minification in production (TerserPlugin)
+- CSS minification (CssMinimizerPlugin)
+- HTML template processing with token replacement
+
+**Token Replacement:**
+HTML templates support token replacement:
+- `#{webviewId}` - Webview ID
+- `#{webviewInstanceId}` - Instance ID
+- `#{cspSource}` - CSP source
+- `#{cspNonce}` - CSP nonce
+- `#{root}` - Extension root URI
+- `#{webroot}` - Webview root URI
+- `#{head}` - Head content from provider
+- `#{body}` - Body content from provider
+- `#{endOfBody}` - End of body content + bootstrap script
+- `#{state}` - Serialized bootstrap state
+
+## Development Guidelines
+
+### TypeScript Configuration
+
+- **Extension code**: Uses `tsconfig.json` (CommonJS, ES2020)
+- **Webview code**: Uses `src/webviews/tsconfig.json` (ES2022, ES modules)
+- **Strict mode**: Enabled
+- **Decorators**: Enabled (`experimentalDecorators: true`)
+
+### Code Style
+
+- **Naming**: camelCase for variables/functions, PascalCase for classes
+- **File naming**: camelCase.ts for files
+- **Imports**: Use ES module imports (`import`/`export`)
+- **Types**: Prefer explicit types over `any`
+
+### Webview Component Guidelines
+
+1. **Extend GlElement**: All components should extend `GlElement`
+2. **Use CSS-in-TypeScript**: Define styles using Lit's `css` template tag
+3. **VS Code Theme**: Always use VS Code CSS variables for theming
+4. **Event Handling**: Use `emit()` for custom events
+5. **Reactive Properties**: Use `@property()` decorator for reactive properties
+6. **State Management**: Use `@state()` for internal component state
+
+### IPC Communication
+
+**From Webview to Extension:**
+```typescript
+const vscode = acquireVsCodeApi();
+vscode.postMessage({
+	type: 'my-command',
+	params: { data: 'value' }
+});
+```
+
+**From Extension to Webview:**
+```typescript
+// In WebviewProvider
+onMessageReceived?(e: any): void {
+	if (e.type === 'my-command') {
+		// Handle message
+	}
+}
+```
+
+**Sending to Webview:**
+```typescript
+// In WebviewController or Provider
+await host.notify('my-notification', { data: 'value' });
+```
+
+### Error Handling
+
+- Always await provider initialization before accessing methods
+- Use optional chaining (`?.`) when accessing provider methods
+- Handle errors in async operations
+- Log errors with context
+
+## Key Patterns
+
+### Singleton Pattern
+- `Manager` class uses singleton pattern for core services
+- Accessed via `Manager.getInstance()`
+
+### Service Pattern
+- Services in `src/service/` handle business logic
+- Services are managed by the `Manager` singleton
+
+### Provider Pattern
+- Webview providers implement `WebviewProvider` interface
+- Providers handle webview-specific logic and state
+
+### Component Pattern
+- Lit components are self-contained, reusable UI elements
+- Components communicate via events and properties
+
+## Dependencies
+
+### Runtime Dependencies
+- `lit` (^3.3.2) - Web Components framework
+- `@lit/context` (^1.1.2) - Context API for dependency injection
+
+### Dev Dependencies
+- `@types/vscode` (^1.74.0) - VS Code API types
+- `@types/node` (16.x) - Node.js types
+- `typescript` (^5.0.0) - TypeScript compiler
+- `webpack` (^5.95.0) - Module bundler
+- `webpack-cli` (^5.1.4) - Webpack CLI
+- `esbuild-loader` (^4.1.1) - Fast TypeScript loader
+- `html-webpack-plugin` (^5.6.0) - HTML generation
+- `mini-css-extract-plugin` (^2.9.0) - CSS extraction
+- `css-loader` (^7.1.2) - CSS loader
+- `sass` (^1.80.0) - SCSS compiler
+- `sass-loader` (^16.0.2) - SCSS loader
+- `css-minimizer-webpack-plugin` (^7.0.0) - CSS minification
+- `terser-webpack-plugin` (^5.3.10) - JavaScript minification
+- `copy-webpack-plugin` (^12.0.2) - Asset copying
+
+## Common Tasks
+
+### Adding a New Command
+1. Create command file in `src/commands/`
+2. Register in `src/extension.ts`
+3. Add to `package.json` contributes.commands
+4. Add activation event if needed
+
+### Adding a New Webview Component
+1. Create component in `src/webviews/apps/shared/components/`
+2. Use `GlElement` as base class
+3. Define styles with `css` template tag
+4. Export with `@customElement()` decorator
+
+### Debugging Webviews
+1. Open webview in VS Code
+2. Right-click → "Inspect" to open DevTools
+3. Check console for errors
+4. Use `console.log()` for debugging
+
+### Testing
+- Extension code: Use VS Code's built-in test runner
+- Webview code: Test in browser DevTools or VS Code webview inspector
+
+## Notes
+
+- Webviews are bundled separately from extension code
+- Webview code runs in a sandboxed environment
+- IPC is the only way to communicate between extension and webview
+- Webviews support ES modules (via webpack `libraryTarget: 'module'`)
+- CSS is extracted and minified separately in production builds
