@@ -9,6 +9,8 @@ const SELECTED_BUILD_VARIANTS_KEY = 'android-studio-lite.selectedBuildVariants';
 
 export class BuildVariantTreeView {
     readonly provider: BuildVariantTreeDataProvider;
+    private fileWatcher: vscode.FileSystemWatcher | undefined;
+
     constructor(context: vscode.ExtensionContext, private manager: Manager) {
         this.provider = new BuildVariantTreeDataProvider(this.manager, context);
 
@@ -17,9 +19,11 @@ export class BuildVariantTreeView {
             showCollapseAll: true
         });
 
-        subscribe(context, [
-            view,
+        // Setup file watcher for build.gradle files
+        this.setupFileWatcher(context);
 
+        const subscriptions: vscode.Disposable[] = [
+            view,
             vscode.commands.registerCommand('android-studio-lite.buildvariant-refresh', this.refresh),
 
             vscode.commands.registerCommand('android-studio-lite.buildvariant-select', async (node) => {
@@ -33,11 +37,52 @@ export class BuildVariantTreeView {
                 }
                 await this.selectBuildVariant(moduleName);
             }),
-        ]);
+        ];
+
+        // Add file watcher to subscriptions if it exists
+        if (this.fileWatcher) {
+            subscriptions.push(this.fileWatcher);
+        }
+
+        subscribe(context, subscriptions);
+    }
+
+    private setupFileWatcher(context: vscode.ExtensionContext) {
+        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspacePath) {
+            return;
+        }
+
+        // Watch for build.gradle and build.gradle.kts files
+        const pattern = new vscode.RelativePattern(
+            workspacePath,
+            '**/{build.gradle,build.gradle.kts}'
+        );
+
+        this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        this.fileWatcher.onDidChange(() => {
+            console.log('[BuildVariantTreeView] build.gradle file changed, clearing cache');
+            this.manager.buildVariant.clearCache();
+            this.provider.refresh();
+        });
+
+        this.fileWatcher.onDidCreate(() => {
+            console.log('[BuildVariantTreeView] build.gradle file created, clearing cache');
+            this.manager.buildVariant.clearCache();
+            this.provider.refresh();
+        });
+
+        this.fileWatcher.onDidDelete(() => {
+            console.log('[BuildVariantTreeView] build.gradle file deleted, clearing cache');
+            this.manager.buildVariant.clearCache();
+            this.provider.refresh();
+        });
     }
 
     refresh = async () => {
-        // Refresh the tree view - this will reload modules and variants
+        // Clear cache and refresh the tree view - this will reload modules and variants
+        this.manager.buildVariant.clearCache();
         this.provider.refresh();
     };
 

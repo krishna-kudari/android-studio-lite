@@ -75,9 +75,15 @@ export class BuildVariantService extends Service {
                 });
             });
             out = variants;
-            this.setCache("getModuleBuildVariants", out);
+            // Cache for 5 minutes (300 seconds)
+            this.setCache("getModuleBuildVariants", out, 300);
         }
         return out;
+    }
+
+    public clearCache(): void {
+        // Force expire the cache by setting it with expired timestamp
+        this.manager.cache.set("getModuleBuildVariants", null, -1);
     }
 
     private getInitScriptPath(context: vscode.ExtensionContext) {
