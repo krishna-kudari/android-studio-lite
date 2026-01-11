@@ -6,6 +6,21 @@ import '../shared/components/dropdown.js';
 import '../shared/components/button.js';
 import type { DropdownOption } from '../shared/components/dropdown.js';
 
+const playIcon = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M0 11.2354V1.06934C0 0.703125 0.090332 0.43457 0.270996 0.263672C0.45166 0.0878906 0.666504 0 0.915527 0C1.13525 0 1.35986 0.0634766 1.58936 0.19043L10.1221 5.17822C10.4248 5.354 10.6348 5.5127 10.752 5.6543C10.874 5.79102 10.9351 5.95703 10.9351 6.15234C10.9351 6.34277 10.874 6.50879 10.752 6.65039C10.6348 6.79199 10.4248 6.95068 10.1221 7.12646L1.58936 12.1143C1.35986 12.2412 1.13525 12.3047 0.915527 12.3047C0.666504 12.3047 0.45166 12.2168 0.270996 12.041C0.090332 11.8652 0 11.5967 0 11.2354Z" fill="white"/>
+</svg>`;
+
+const progressSpinnerIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="spinner-icon">
+<rect x="7" width="2" height="5" rx="1" fill="white" fill-opacity="0.8"/>
+<rect x="12.9497" y="1.63604" width="2" height="5" rx="1" transform="rotate(45 12.9497 1.63604)" fill="white" fill-opacity="0.1"/>
+<rect x="16" y="7" width="2" height="5" rx="1" transform="rotate(90 16 7)" fill="white" fill-opacity="0.2"/>
+<rect x="14.364" y="12.9497" width="2" height="5" rx="1" transform="rotate(135 14.364 12.9497)" fill="white" fill-opacity="0.3"/>
+<rect x="9" y="16" width="2" height="5" rx="1" transform="rotate(180 9 16)" fill="white" fill-opacity="0.4"/>
+<rect x="3.05029" y="14.364" width="2" height="5" rx="1" transform="rotate(-135 3.05029 14.364)" fill="white" fill-opacity="0.5"/>
+<rect y="9" width="2" height="5" rx="1" transform="rotate(-90 0 9)" fill="white" fill-opacity="0.6"/>
+<rect x="1.63599" y="3.05025" width="2" height="5" rx="1" transform="rotate(-45 1.63599 3.05025)" fill="white" fill-opacity="0.7"/>
+</svg>`;
+
 interface AVD {
     name: string;
     basedOn: string;
@@ -73,22 +88,6 @@ export class ASlAVDSelectorApp extends ASlElement {
 
 			.button-group asl-button {
 				flex: 1;
-			}
-
-			.loading-spinner {
-				display: inline-block;
-				width: 0.875rem;
-				height: 0.875rem;
-				border: 2px solid var(--vscode-button-foreground);
-				border-top-color: transparent;
-				border-radius: 50%;
-				animation: spin 0.8s linear infinite;
-			}
-
-			@keyframes spin {
-				to {
-					transform: rotate(360deg);
-				}
 			}
 		`,
     ];
@@ -338,13 +337,11 @@ export class ASlAVDSelectorApp extends ASlElement {
 
 				<div class="button-group">
 					<asl-button
-						icon=${this.isBuilding ? '' : '▶'}
+						icon=${this.isBuilding ? progressSpinnerIcon : playIcon}
 						label=${this.isBuilding ? 'Building...' : 'Run'}
 						?disabled=${!this.selectedAVD || !this.selectedModule || this.isBuilding}
 						@button-click=${this.handleRunClick}
-					>
-						${this.isBuilding ? html`<span class="loading-spinner"></span>` : ''}
-					</asl-button>
+					></asl-button>
 					<asl-button
 						variant="secondary"
 						icon="⏹"

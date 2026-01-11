@@ -26,35 +26,45 @@ export class ASlDropdown extends ASlElement {
 				width: 100%;
 			}
 
+			/* macOS Pull-Down Button - Dark Theme */
 			.dropdown-button {
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
 				width: 100%;
-				padding: 0.25rem 0.5rem;
-				font-size: 0.875rem;
-				font-family: var(--vscode-font-family);
-				color: var(--vscode-foreground);
-				background-color: var(--vscode-dropdown-background);
-				border: 1px solid var(--vscode-dropdown-border);
-				border-radius: 2px;
+				height: 22px;
+				padding: 0 7px;
+				font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+				font-size: 13px;
+				font-weight: 400;
+				line-height: 16px;
+				color: rgba(255, 255, 255, 0.85);
+				background-color: rgba(255, 255, 255, 0.1);
+				border: none;
+				border-radius: 5px;
 				cursor: pointer;
-				transition: background-color 0.1s ease;
-				min-height: 22px;
+				transition: background-color 0.15s ease;
+				user-select: none;
+				outline: none;
 			}
 
 			.dropdown-button:hover {
-				background-color: var(--vscode-dropdown-listBackground);
+				background-color: rgba(255, 255, 255, 0.15);
+			}
+
+			.dropdown-button:active {
+				background-color: rgba(255, 255, 255, 0.2);
 			}
 
 			.dropdown-button:focus {
-				outline: 1px solid var(--vscode-focusBorder);
-				outline-offset: -1px;
+				outline: 2px solid #007aff;
+				outline-offset: 2px;
 			}
 
 			.dropdown-button[disabled] {
-				opacity: 0.5;
 				cursor: not-allowed;
+				background-color: rgba(255, 255, 255, 0.05);
+				color: rgba(255, 255, 255, 0.25);
 			}
 
 			.dropdown-label {
@@ -63,64 +73,116 @@ export class ASlDropdown extends ASlElement {
 				overflow: hidden;
 				white-space: nowrap;
 				text-align: left;
+				color: inherit;
+			}
+
+			/* Combo Box Button (chevron container) - matches Figma design */
+			.dropdown-icon-container {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 15px;
+				height: 16px;
+				margin-left: 4px;
+				background-color: #007aff;
+				background-image: linear-gradient(
+					to bottom,
+					rgba(255, 255, 255, 0.17) 0%,
+					rgba(255, 255, 255, 0) 100%
+				);
+				border-radius: 4px;
+				flex-shrink: 0;
+				position: relative;
+			}
+
+			.dropdown-button[disabled] .dropdown-icon-container {
+				background-color: rgba(255, 255, 255, 0.1);
+				background-image: none;
 			}
 
 			.dropdown-icon {
-				margin-left: 0.5rem;
-				font-size: 0.75rem;
-				color: var(--vscode-foreground);
-				opacity: 0.7;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 15px;
+				height: 15.5px;
 				transition: transform 0.2s ease;
+				flex-shrink: 0;
+			}
+
+			.dropdown-icon svg {
+				width: 9px;
+				height: 6px;
+				display: block;
+			}
+
+			.dropdown-icon svg path {
+				fill: #ffffff;
+				fill-opacity: 1;
+			}
+
+			.dropdown-button[disabled] .dropdown-icon svg path {
+				fill: rgba(255, 255, 255, 0.25);
 			}
 
 			.dropdown-icon.open {
 				transform: rotate(180deg);
 			}
 
+			/* macOS Menu - Dark Theme */
 			.dropdown-menu {
 				position: absolute;
-				top: calc(100% + 2px);
+				top: calc(100% + 4px);
 				left: 0;
-				right: 0;
-				background-color: var(--vscode-dropdown-background);
-				border: 1px solid var(--vscode-dropdown-border);
-				border-radius: 2px;
-				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+				min-width: 100%;
+				background-color: rgba(28, 28, 30, 0.95);
+				backdrop-filter: blur(20px);
+				border-radius: 6px;
+				box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 				max-height: 200px;
 				overflow-y: auto;
 				z-index: 10000;
 				display: none;
+				padding: 2px;
 			}
 
 			.dropdown-menu.open {
 				display: block;
 			}
 
+			/* macOS Menu Item - Dark Theme */
 			.dropdown-item {
-				padding: 0.25rem 0.5rem;
-				font-size: 0.875rem;
-				font-family: var(--vscode-font-family);
-				color: var(--vscode-foreground);
+				display: flex;
+				align-items: center;
+				height: 22px;
+				padding: 0 7px;
+				font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+				font-size: 13px;
+				font-weight: 510;
+				line-height: 16px;
+				color: rgba(255, 255, 255, 0.85);
 				cursor: pointer;
 				transition: background-color 0.1s ease;
 				text-overflow: ellipsis;
 				overflow: hidden;
 				white-space: nowrap;
+				border-radius: 5px;
+				margin: 0 2px;
 			}
 
 			.dropdown-item:hover {
-				background-color: var(--vscode-list-hoverBackground);
+				background-color: rgba(255, 255, 255, 0.1);
 			}
 
 			.dropdown-item.selected {
-				background-color: var(--vscode-list-activeSelectionBackground);
-				color: var(--vscode-list-activeSelectionForeground);
+				background-color: #007aff;
+				color: #ffffff;
 			}
 
 			.dropdown-empty {
-				padding: 0.5rem;
-				font-size: 0.875rem;
-				color: var(--vscode-descriptionForeground);
+				padding: 8px;
+				font-size: 13px;
+				color: rgba(255, 255, 255, 0.5);
 				text-align: center;
 			}
 		`,
@@ -192,7 +254,13 @@ export class ASlDropdown extends ASlElement {
 					aria-expanded=${this.isOpen}
 				>
 					<span class="dropdown-label">${this.displayLabel}</span>
-					<span class="dropdown-icon ${this.isOpen ? 'open' : ''}">▼</span>
+					<div class="dropdown-icon-container">
+						<span class="dropdown-icon ${this.isOpen ? 'open' : ''}">
+							<svg width="8" height="6" viewBox="0 0 8.3 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<path d="M0.241699 1.46338L3.41016 4.70215C3.62988 4.9248 3.87305 5.03613 4.13965 5.03613C4.27734 5.0332 4.40332 5.00537 4.51758 4.95264C4.63477 4.8999 4.75049 4.81641 4.86475 4.70215L8.02881 1.46338C8.19287 1.30225 8.2749 1.10449 8.2749 0.870117C8.2749 0.708984 8.23535 0.5625 8.15625 0.430664C8.08008 0.301758 7.97607 0.197754 7.84424 0.118652C7.71533 0.0395508 7.57178 0 7.41357 0C7.17041 0 6.95947 0.0952148 6.78076 0.285645L3.99463 3.17285H4.29346L1.49854 0.285645C1.31396 0.0952148 1.1001 0 0.856934 0C0.70166 0 0.558105 0.0395508 0.42627 0.118652C0.297363 0.197754 0.193359 0.301758 0.114258 0.430664C0.0380859 0.5625 0 0.708984 0 0.870117C0 0.987305 0.019043 1.09424 0.0571289 1.19092C0.0981445 1.2876 0.159668 1.37842 0.241699 1.46338Z" fill="white"/>
+							</svg>
+						</span>
+					</div>
 				</button>
 				<div class="dropdown-menu ${this.isOpen ? 'open' : ''}">
 					${this.options.length === 0
