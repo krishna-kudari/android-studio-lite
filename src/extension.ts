@@ -1,11 +1,9 @@
 import * as vscode from 'vscode';
-import { ViewColumn } from 'vscode';
 import { AVDTreeView } from './ui/AVDTreeView';
 import { BuildVariantTreeView } from './ui/BuildVariantTreeView';
 import { Manager, ConfigItem } from './core';
 import { subscribe } from './module/';
 import { WebviewsController } from './webviews/webviewsController';
-import { ExampleWebviewProvider } from './webviews/exampleProvider';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -38,20 +36,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	new BuildVariantTreeView(context, manager);
 	console.log("build variant loaded");
 
-	// Register example webview panel
-	const exampleWebview = webviewsController.registerWebviewPanel(
-		{
-			id: 'android-studio-lite.example',
-			fileName: 'example.html',
-			iconPath: 'assets/android_studio_alt_macos_bigsur_icon_190395.png',
-			title: 'Example Webview',
-			contextKeyPrefix: 'android-studio-lite:webview:example',
-			column: ViewColumn.Beside,
-		},
-		async (host) => new ExampleWebviewProvider(host),
-	);
-	context.subscriptions.push(exampleWebview);
-
 	// Register commands
 	subscribe(context, [
 		vscode.commands.registerCommand('android-studio-lite.setup-sdkpath', async () => {
@@ -65,9 +49,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		}),
 		vscode.commands.registerCommand('android-studio-lite.setup-emulator', async () => {
 			await manager.android.updatePathDiag("file", ConfigItem.emulator, "Please select the Emulator Path", "Emulator path updated!", "Emulator path not specified!");
-		}),
-		vscode.commands.registerCommand('android-studio-lite.showExampleWebview', async () => {
-			await exampleWebview.show();
 		}),
 
 	]);

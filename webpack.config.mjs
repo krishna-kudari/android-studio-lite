@@ -39,23 +39,6 @@ function getWebviewsConfig(mode, env, isProduction) {
     /** @type WebpackConfig['plugins'] | any */
     const plugins = [
         new HtmlPlugin({
-            template: path.join(basePath, 'example', 'example.html'),
-            chunks: ['example'],
-            filename: path.join(__dirname, 'dist', 'webviews', 'example.html'),
-            inject: true,
-            scriptLoading: 'module',
-            minify: isProduction ? {
-                removeComments: true,
-                collapseWhitespace: true,
-                removeRedundantAttributes: false,
-                useShortDoctype: true,
-                removeEmptyAttributes: true,
-                removeStyleLinkTypeAttributes: true,
-                keepClosingSlash: true,
-                minifyCSS: true,
-            } : false,
-        }),
-        new HtmlPlugin({
             template: path.join(basePath, 'avdSelector', 'avdSelector.html'),
             chunks: ['avdSelector'],
             filename: path.join(__dirname, 'dist', 'webviews', 'avdSelector.html'),
@@ -79,7 +62,6 @@ function getWebviewsConfig(mode, env, isProduction) {
         name: 'webviews',
         context: basePath,
         entry: {
-            example: './example/example.ts',
             avdSelector: './avdSelector/avdSelector.ts',
         },
         mode: mode,

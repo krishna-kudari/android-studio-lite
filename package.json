@@ -3,6 +3,12 @@
   "displayName": "Android Studio Lite",
   "description": "Android Dev Companion for Cursor/VS Code - Device management and app lifecycle controls",
   "version": "0.0.1",
+  "publisher": "krishnagurubasappakudari",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/krishna-kudari/android-studio-lite"
+  },
+  "icon": "assets/android_studio_alt_macos_bigsur_icon_190395.png",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -188,11 +194,6 @@
         "command": "android-studio-lite.buildvariant-refresh",
         "title": "Refresh Build Variants",
         "icon": "$(refresh)"
-      },
-      {
-        "command": "android-studio-lite.showExampleWebview",
-        "title": "Show Example Webview",
-        "icon": "$(browser)"
       }
     ],
     "menus": {
