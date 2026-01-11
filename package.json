@@ -32,7 +32,7 @@
         {
           "id": "android-studio-lite",
           "title": "Android Studio Lite",
-          "icon": "$(device-mobile)"
+          "icon": "assets/android-studio.svg"
         }
       ]
     },
