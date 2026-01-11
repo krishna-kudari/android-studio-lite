@@ -2,11 +2,11 @@ import * as vscode from 'vscode';
 import { ViewColumn } from 'vscode';
 import { AVDTreeView } from './ui/AVDTreeView';
 import { BuildVariantTreeView } from './ui/BuildVariantTreeView';
-import { AVDDropdownViewProvider } from './ui/AVDDropdownView';
 import { Manager, ConfigItem } from './core';
 import { subscribe } from './module/';
 import { WebviewsController } from './webviews/webviewsController';
 import { ExampleWebviewProvider } from './webviews/exampleProvider';
+import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
 
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
@@ -15,31 +15,28 @@ export async function activate(context: vscode.ExtensionContext) {
 	const manager = Manager.getInstance();
 	await manager.android.initCheck();
 
-	const avdDropdownProvider = new AVDDropdownViewProvider(context, manager);
+	// Register AVD Selector webview view using new architecture
+	const webviewsController = new WebviewsController(context);
+	context.subscriptions.push(webviewsController);
+
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(
-			AVDDropdownViewProvider.viewType,
-			avdDropdownProvider,
+		webviewsController.registerWebviewView(
 			{
-				webviewOptions: {
-					retainContextWhenHidden: true
-				}
-			}
+				id: 'android-studio-lite-avd-dropdown',
+				fileName: 'avdSelector.html',
+				title: 'Android Studio Lite',
+			},
+			async (host) => new AVDSelectorProvider(host, context),
 		)
 	);
 
 	//avd manager
 	const avdTreeView = new AVDTreeView(context, manager);
-	avdTreeView.setDropdownProvider(avdDropdownProvider);
 	console.log("avd loaded");
 
 	//build variant manager
 	new BuildVariantTreeView(context, manager);
 	console.log("build variant loaded");
-
-	// Initialize webviews controller
-	const webviewsController = new WebviewsController(context);
-	context.subscriptions.push(webviewsController);
 
 	// Register example webview panel
 	const exampleWebview = webviewsController.registerWebviewPanel(

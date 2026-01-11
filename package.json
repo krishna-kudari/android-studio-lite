@@ -34,7 +34,7 @@
       "android-studio-lite": [
         {
           "id": "android-studio-lite-avd-dropdown",
-          "name": "AVD Selector",
+          "name": "Android Studio Lite",
           "type": "webview",
           "when": "true"
         },

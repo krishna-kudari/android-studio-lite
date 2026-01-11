@@ -55,6 +55,23 @@ function getWebviewsConfig(mode, env, isProduction) {
                 minifyCSS: true,
             } : false,
         }),
+        new HtmlPlugin({
+            template: path.join(basePath, 'avdSelector', 'avdSelector.html'),
+            chunks: ['avdSelector'],
+            filename: path.join(__dirname, 'dist', 'webviews', 'avdSelector.html'),
+            inject: true,
+            scriptLoading: 'module',
+            minify: isProduction ? {
+                removeComments: true,
+                collapseWhitespace: true,
+                removeRedundantAttributes: false,
+                useShortDoctype: true,
+                removeEmptyAttributes: true,
+                removeStyleLinkTypeAttributes: true,
+                keepClosingSlash: true,
+                minifyCSS: true,
+            } : false,
+        }),
         new MiniCssExtractPlugin({ filename: '[name].css' }),
     ];
 
@@ -63,6 +80,7 @@ function getWebviewsConfig(mode, env, isProduction) {
         context: basePath,
         entry: {
             example: './example/example.ts',
+            avdSelector: './avdSelector/avdSelector.ts',
         },
         mode: mode,
         target: 'web',
@@ -81,23 +99,12 @@ function getWebviewsConfig(mode, env, isProduction) {
         optimization: {
             minimizer: isProduction ? [
                 new TerserPlugin({
-                    minify: TerserPlugin.swcMinify,
+                    minify: TerserPlugin.esbuildMinify,
                     extractComments: false,
                     parallel: true,
                     terserOptions: {
-                        compress: {
-                            drop_debugger: true,
-                            drop_console: true,
-                            ecma: 2020,
-                            keep_classnames: true,
-                            module: true,
-                        },
                         format: {
                             comments: false,
-                            ecma: 2020,
-                        },
-                        mangle: {
-                            keep_classnames: true,
                         },
                     },
                 }),

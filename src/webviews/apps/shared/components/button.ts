@@ -1,13 +1,13 @@
 import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { GlElement } from './element.js';
+import { ASlElement } from './element.js';
 
 export interface ButtonClickEventDetail {
-    button: GlButton;
+    button: ASlButton;
 }
 
-@customElement('gl-button')
-export class GlButton extends GlElement {
+@customElement('asl-button')
+export class ASlButton extends ASlElement {
     static override styles = [
         css`
 			:host {

@@ -6,6 +6,7 @@ export interface BuildVariantModel {
     name: string;
     flavors: string[];
     buildType: string;
+    applicationId?: string;
     tasks: {
         assemble: string;
         install?: string;
@@ -32,6 +33,7 @@ export interface Module {
  *           "flavors": [
  *             "production"
  *           ],
+ *           "applicationId": "com.krishna.github_fastlane_ci_cd.debug",
  *           "tasks": {
  *             "assemble": "assembleProductionDebug",
  *             "install": "installProductionDebug"
@@ -43,6 +45,7 @@ export interface Module {
  *           "flavors": [
  *             "staging"
  *           ],
+ *           "applicationId": "com.krishna.github_fastlane_ci_cd.debug",
  *           "tasks": {
  *             "assemble": "assembleStagingDebug",
  *             "install": "installStagingDebug"
@@ -54,6 +57,7 @@ export interface Module {
  *           "flavors": [
  *             "production"
  *           ],
+ *           "applicationId": "com.krishna.github_fastlane_ci_cd.release",
  *           "tasks": {
  *             "assemble": "assembleProductionRelease",
  *             "bundle": "bundleProductionRelease"
@@ -65,6 +69,7 @@ export interface Module {
  *           "flavors": [
  *             "staging"
  *           ],
+ *           "applicationId": "com.krishna.github_fastlane_ci_cd.release",
  *           "tasks": {
  *             "assemble": "assembleStagingRelease",
  *             "bundle": "bundleStagingRelease"

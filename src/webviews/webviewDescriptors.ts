@@ -16,7 +16,6 @@ export interface WebviewViewDescriptor {
     id: string;
     readonly fileName: string;
     readonly title: string;
-    readonly contextKeyPrefix: string;
     readonly webviewOptions?: WebviewOptions;
     readonly webviewHostOptions?: {
         readonly retainContextWhenHidden?: boolean;

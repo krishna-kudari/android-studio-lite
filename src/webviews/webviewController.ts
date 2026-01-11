@@ -34,7 +34,10 @@ export class WebviewController implements WebviewHost, Disposable {
         this.id = descriptor.id;
         this.webview = parent.webview;
         this._originalTitle = descriptor.title;
-        parent.title = descriptor.title;
+        // Only set title if not already set (webview views might have title set in resolveWebviewView)
+        if (!parent.title) {
+            parent.title = descriptor.title;
+        }
 
         this._providerInitialized = resolveProvider(this).then(provider => {
             this.provider = provider;
@@ -177,30 +180,49 @@ export class WebviewController implements WebviewHost, Disposable {
         const webRootUri = Uri.joinPath(this.context.extensionUri, 'dist', 'webviews');
         const uri = Uri.joinPath(webRootUri, this.descriptor.fileName);
 
-        const [bytes, bootstrap, head, body, endOfBody] = await Promise.all([
-            workspace.fs.readFile(uri),
-            this.provider?.includeBootstrap?.(true),
-            this.provider?.includeHead?.(),
-            this.provider?.includeBody?.(),
-            this.provider?.includeEndOfBody?.(),
-        ]);
+        try {
+            const [bytes, bootstrap, head, body, endOfBody] = await Promise.all([
+                workspace.fs.readFile(uri),
+                this.provider?.includeBootstrap?.(true),
+                this.provider?.includeHead?.(),
+                this.provider?.includeBody?.(),
+                this.provider?.includeEndOfBody?.(),
+            ]);
 
-        const htmlContent = Buffer.from(bytes).toString('utf8');
-        const serialized = bootstrap != null ? base64(JSON.stringify(bootstrap)) : '';
+            const htmlContent = Buffer.from(bytes).toString('utf8');
+            const serialized = bootstrap != null ? base64(JSON.stringify(bootstrap)) : '';
 
-        return replaceWebviewHtmlTokens(
-            htmlContent,
-            this.id,
-            this.instanceId,
-            webview.cspSource,
-            this._cspNonce,
-            this.asWebviewUri(this.context.extensionUri).toString(),
-            this.getWebRoot(),
-            serialized,
-            head,
-            body,
-            endOfBody,
-        );
+            return replaceWebviewHtmlTokens(
+                htmlContent,
+                this.id,
+                this.instanceId,
+                webview.cspSource,
+                this._cspNonce,
+                this.asWebviewUri(this.context.extensionUri).toString(),
+                this.getWebRoot(),
+                serialized,
+                head,
+                body,
+                endOfBody,
+            );
+        } catch (error) {
+            console.error(`[WebviewController] Error loading HTML file ${this.descriptor.fileName}:`, error);
+            // Return a basic error HTML
+            return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error</title>
+</head>
+<body>
+    <h1>Error loading webview</h1>
+    <p>Failed to load ${this.descriptor.fileName}</p>
+    <p>Error: ${error instanceof Error ? error.message : String(error)}</p>
+    <p>Please ensure the webview has been built.</p>
+</body>
+</html>`;
+        }
     }
 }
 
@@ -229,7 +251,7 @@ function replaceWebviewHtmlTokens(
                     return bootstrap ?? '';
                 case 'endOfBody':
                     return `${bootstrap != null
-                        ? `<script type="text/javascript" nonce="${cspNonce}">window.bootstrap=${bootstrap};</script>`
+                        ? `<script type="text/javascript" nonce="${cspNonce}">window.bootstrap="${bootstrap}";</script>`
                         : ''
                         }${endOfBody ?? ''}`;
                 case 'webviewId':

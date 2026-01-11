@@ -16,11 +16,67 @@ import type { WebviewProvider, WebviewHost } from './webviewProvider.js';
 export class WebviewsController implements Disposable {
     private readonly disposables: Disposable[] = [];
     private readonly _panels = new Map<string, Map<string | undefined, WebviewController>>();
+    private readonly _views = new Map<string, WebviewController>();
 
     constructor(private readonly context: vscode.ExtensionContext) { }
 
     dispose(): void {
         this.disposables.forEach(d => d.dispose());
+    }
+
+    registerWebviewView<State, SerializedState = State, ShowingArgs extends unknown[] = unknown[]>(
+        descriptor: WebviewViewDescriptor,
+        resolveProvider: (host: WebviewHost) => Promise<WebviewProvider<State, SerializedState, ShowingArgs>>,
+    ): Disposable {
+        const context = this.context;
+        const views = this._views;
+
+        const disposable = VSCodeDisposable.from(
+            window.registerWebviewViewProvider(
+                descriptor.id,
+                {
+                    async resolveWebviewView(
+                        webviewView: WebviewView,
+                        _context: vscode.WebviewViewResolveContext,
+                        _token: vscode.CancellationToken,
+                    ) {
+                        // Set webview options before creating controller
+                        webviewView.webview.options = {
+                            enableCommandUris: true,
+                            enableScripts: true,
+                            localResourceRoots: [Uri.file(context.extensionPath)],
+                            ...descriptor.webviewOptions,
+                        };
+
+                        webviewView.title = descriptor.title;
+
+                        const instanceId = uuid();
+                        const controller = new WebviewController(
+                            context,
+                            descriptor,
+                            instanceId,
+                            webviewView,
+                            resolveProvider,
+                        );
+
+                        try {
+                            await controller.show(true);
+                            // Store controller for later access if needed
+                            if (!views.has(descriptor.id)) {
+                                views.set(descriptor.id, controller);
+                            }
+                        } catch (error) {
+                            console.error(`[WebviewsController] Error showing webview view ${descriptor.id}:`, error);
+                            throw error;
+                        }
+                    },
+                },
+                descriptor.webviewHostOptions != null ? { webviewOptions: descriptor.webviewHostOptions } : undefined,
+            ),
+        );
+
+        this.disposables.push(disposable);
+        return disposable;
     }
 
     registerWebviewPanel<State, SerializedState = State, ShowingArgs extends unknown[] = unknown[]>(

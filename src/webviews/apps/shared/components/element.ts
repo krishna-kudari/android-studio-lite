@@ -1,7 +1,7 @@
 import type { PropertyValues } from 'lit';
 import { LitElement } from 'lit';
 
-export abstract class GlElement extends LitElement {
+export abstract class ASlElement extends LitElement {
     emit<T extends keyof HTMLElementEventMap>(
         name: T,
         detail?: any,

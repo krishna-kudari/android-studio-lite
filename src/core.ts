@@ -7,6 +7,7 @@ import { Output } from "./module/ui";
 import { Cache } from "./module/cache";
 import { Platform } from "./module/platform";
 import { BuildVariantService } from "./service/BuildVariantService";
+import { GradleService } from "./service/GradleService";
 
 export interface IConfig {
     /** PATHS */
@@ -57,6 +58,7 @@ export class Manager {
     readonly android: AndroidService;
     readonly avd: AVDService;
     readonly buildVariant: BuildVariantService;
+    readonly gradle: GradleService;
     readonly output: Output;
     readonly cache: Cache;
 
@@ -66,6 +68,7 @@ export class Manager {
         this.android = new AndroidService(this);
         this.avd = new AVDService(this);
         this.buildVariant = new BuildVariantService(this);
+        this.gradle = new GradleService(this);
         this.output = new Output("Android Studio Lite");
     }
 

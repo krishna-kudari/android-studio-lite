@@ -1,2 +1,2 @@
 // Re-export button component
-export { GlButton } from '../../shared/components/button.js';
+export { ASlButton } from '../../shared/components/button.js';

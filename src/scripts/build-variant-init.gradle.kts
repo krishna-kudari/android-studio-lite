@@ -4,75 +4,81 @@
  * ```
  * ANDROID_BUILD_VARIANTS_PROTOCOL={
  *   "schemaVersion": 1,
- *   "generatedAt": 1768035436814,
+ *   "generatedAt": 1768111154600,
  *   "modules": {
  *     ":app": {
  *       "type": "application",
  *       "variants": [
  *         {
- *           "name": "productionDebug",
+ *           "name": "ProductionDebug",
  *           "buildType": "debug",
  *           "flavors": [
- *             "production"
+ *             "Production"
  *           ],
+ *           "applicationId": "com.krishna.github_fastlane_ci_cd.debug",
  *           "tasks": {
  *             "assemble": "assembleProductionDebug",
  *             "install": "installProductionDebug"
  *           }
  *         },
  *         {
- *           "name": "preproductionDebug",
- *           "buildType": "debug",
- *           "flavors": [
- *             "preproduction"
- *           ],
- *           "tasks": {
- *             "assemble": "assemblePreproductionDebug",
- *             "install": "installPreproductionDebug"
- *           }
- *         },
- *         {
- *           "name": "stagingDebug",
- *           "buildType": "debug",
- *           "flavors": [
- *             "staging"
- *           ],
- *           "tasks": {
- *             "assemble": "assembleStagingDebug",
- *             "install": "installStagingDebug"
- *           }
- *         },
- *         {
- *           "name": "productionRelease",
+ *           "name": "ProductionRelease",
  *           "buildType": "release",
  *           "flavors": [
- *             "production"
+ *             "Production"
  *           ],
+ *           "applicationId": "com.krishna.github_fastlane_ci_cd",
  *           "tasks": {
  *             "assemble": "assembleProductionRelease",
  *             "bundle": "bundleProductionRelease"
  *           }
- *         },
+ *         }
+ *       ]
+ *     },
+ *     ":applite": {
+ *       "type": "application",
+ *       "variants": [
  *         {
- *           "name": "preproductionRelease",
- *           "buildType": "release",
- *           "flavors": [
- *             "preproduction"
- *           ],
+ *           "name": "debug",
+ *           "buildType": "debug",
+ *           "flavors": [],
+ *           "applicationId": "com.example.applite",
  *           "tasks": {
- *             "assemble": "assemblePreproductionRelease",
- *             "bundle": "bundlePreproductionRelease"
+ *             "assemble": "assembleDebug",
+ *             "install": "installDebug"
  *           }
  *         },
  *         {
- *           "name": "stagingRelease",
+ *           "name": "release",
  *           "buildType": "release",
- *           "flavors": [
- *             "staging"
- *           ],
+ *           "flavors": [],
+ *           "applicationId": "com.example.applite",
  *           "tasks": {
- *             "assemble": "assembleStagingRelease",
- *             "bundle": "bundleStagingRelease"
+ *             "assemble": "assembleRelease",
+ *             "bundle": "bundleRelease"
+ *           }
+ *         }
+ *       ]
+ *     },
+ *     ":authsdk": {
+ *       "type": "library",
+ *       "variants": [
+ *         {
+ *           "name": "debug",
+ *           "buildType": "debug",
+ *           "flavors": [],
+ *           "applicationId": null,
+ *           "tasks": {
+ *             "assemble": "assembleDebug"
+ *           }
+ *         },
+ *         {
+ *           "name": "release",
+ *           "buildType": "release",
+ *           "flavors": [],
+ *           "applicationId": null,
+ *           "tasks": {
+ *             "assemble": "assembleRelease"
  *           }
  *         }
  *       ]
@@ -123,6 +129,20 @@ gradle.rootProject {
                             v.javaClass.getMethod("getName")
                                 .invoke(v) as String
 
+                        val applicationId: String? =
+                            if (isApp) {
+                                try {
+                                    val getAppId = v.javaClass.methods
+                                        .firstOrNull { it.name == "getApplicationId" }
+
+                                    when (val value = getAppId?.invoke(v)) {
+                                        is String -> value
+                                        else -> null
+                                    }
+                                } catch (_: Throwable) {
+                                    null
+                                }
+                            } else null
                         val buildTypeObj =
                             v.javaClass.getMethod("getBuildType")
                                 .invoke(v)
@@ -162,6 +182,7 @@ gradle.rootProject {
                                 "name" to name,
                                 "buildType" to buildType,
                                 "flavors" to flavorNames,
+                                "applicationId" to applicationId,
                                 "tasks" to tasks
                             )
                         )
