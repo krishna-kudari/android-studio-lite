@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/krishna-kudari/android-studio-lite"
   },
-  "icon": "assets/android_studio_alt_macos_bigsur_icon_190395.png",
+  "icon": "assets/android-studio-macos-transparent.png",
   "engines": {
     "vscode": "^1.74.0"
   },

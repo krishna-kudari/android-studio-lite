@@ -15,3 +15,7 @@ package-lock.json
 node_modules/**
 out/**
 dist/webviews/*.map
+# Exclude other logo files, keep only android-studio-macos-transparent.png
+assets/android-studio-macos-dark-transparent.png
+assets/android-studio-macos-dark.png
+assets/android-studio-macos.png
