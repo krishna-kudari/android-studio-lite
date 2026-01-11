@@ -87,15 +87,26 @@ export class BuildVariantService extends Service {
     }
 
     private getInitScriptPath(context: vscode.ExtensionContext) {
-        const buildVariantGradleInitScriptPath = path.join(
+        // Try to find script in out/scripts first (published extension), then src/scripts (development)
+        let buildVariantGradleInitScriptPath = path.join(
             context.extensionPath,
-            'src',
+            'out',
             'scripts',
             'build-variant-init.gradle.kts'
         );
 
         if (!fs.existsSync(buildVariantGradleInitScriptPath)) {
-            throw new Error(`[BuildVariantService] Build variant Gradle init script not found at: ${buildVariantGradleInitScriptPath}`);
+            // Fallback to src/scripts for development
+            buildVariantGradleInitScriptPath = path.join(
+                context.extensionPath,
+                'src',
+                'scripts',
+                'build-variant-init.gradle.kts'
+            );
+        }
+
+        if (!fs.existsSync(buildVariantGradleInitScriptPath)) {
+            throw new Error(`[BuildVariantService] Build variant Gradle init script not found. Checked: ${path.join(context.extensionPath, 'out/scripts')} and ${path.join(context.extensionPath, 'src/scripts')}`);
         }
 
         const buildVariantGradleInitScriptContent = fs.readFileSync(buildVariantGradleInitScriptPath, 'utf-8');

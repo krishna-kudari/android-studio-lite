@@ -409,7 +409,8 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "npm run compile:extension && npm run compile:webviews",
-    "compile:extension": "tsc -p ./",
+    "compile:extension": "tsc -p ./ && npm run copy:scripts",
+    "copy:scripts": "node scripts/copy-scripts.js",
     "compile:webviews": "webpack --mode production",
     "watch": "npm run watch:extension & npm run watch:webviews",
     "watch:extension": "tsc -watch -p ./",

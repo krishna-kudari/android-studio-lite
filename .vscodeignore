@@ -15,6 +15,8 @@ package-lock.json
 node_modules/**
 out/**/*.map
 dist/webviews/*.map
+# Exclude build scripts (not needed in published extension)
+scripts/copy-scripts.js
 # Exclude other logo files, keep only android-studio-macos-transparent.png
 assets/android-studio-macos-dark-transparent.png
 assets/android-studio-macos-dark.png
