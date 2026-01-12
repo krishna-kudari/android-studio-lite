@@ -1,9 +1,6 @@
 import { IConfig, Manager } from '../core';
 import { ICommandProp, Executable, CommandType } from './Executable';
 
-
-
-
 export interface AVDDevice {
     id: number;
     idName: string;

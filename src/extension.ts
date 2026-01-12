@@ -38,6 +38,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Register commands
 	subscribe(context, [
+		vscode.commands.registerCommand('android-studio-lite.setup-wizard', async () => {
+			await manager.android.initCheck();
+		}),
 		vscode.commands.registerCommand('android-studio-lite.setup-sdkpath', async () => {
 			await manager.android.updatePathDiag("dir", ConfigItem.sdkPath, "Please select the Android SDK Root Path", "Android SDK Root path updated!", "Android SDK path not specified!");
 		}),

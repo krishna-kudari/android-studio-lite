@@ -5,6 +5,8 @@ import * as os from 'os';
 import { Service } from "./Service";
 import { Manager } from "../core";
 import { AndroidBuildVariantsModel, BuildVariantExecutable, Command, Module } from "../cmd/BuildVariant";
+import { AndroidSdkDetector } from "../utils/androidSdkDetector";
+import { showMsg, MsgType } from '../module/ui';
 
 
 export interface MuduleBuildVariant extends Module {
@@ -51,32 +53,80 @@ export class BuildVariantService extends Service {
     public async getModuleBuildVariants(context: vscode.ExtensionContext): Promise<MuduleBuildVariant[]> {
         let out = this.getCache("getModuleBuildVariants");
         if (!out) {
-
-            const initScriptPath = this.getInitScriptPath(context);
-            const variantsObj = await this.buildVariant.exec<AndroidBuildVariantsModel>(
-                Command.load,
-                initScriptPath,
-                { cwd: this.workspacePath }
-            );
-            fs.unlinkSync(initScriptPath);
-
-            if (!variantsObj) {
+            // Check if gradlew exists before attempting to run
+            if (!this.workspacePath) {
+                showMsg(MsgType.warning, "No workspace folder found. Please open an Android project folder.");
                 return defaultVariants;
             }
 
-            const variants: MuduleBuildVariant[] = [];
+            const gradleCheck = AndroidSdkDetector.checkGradleWrapper(this.workspacePath);
+            if (!gradleCheck.exists) {
+                const errorMsg = gradleCheck.error || `Gradle wrapper not found at: ${gradleCheck.path}`;
+                showMsg(
+                    MsgType.error,
+                    `${errorMsg}\n\nMake sure you're in an Android project root directory.`,
+                    {}
+                );
+                return defaultVariants;
+            }
 
-            Object.entries(variantsObj.modules).forEach(([module, moduleObj]) => {
-                const moduleData = moduleObj as Module;
-                variants.push({
-                    module: module,
-                    type: moduleData.type,
-                    variants: moduleData.variants,
+            // If gradlew exists but is not executable, try to fix it
+            if (gradleCheck.error && gradleCheck.error.includes('not executable')) {
+                try {
+                    fs.chmodSync(gradleCheck.path, 0o755);
+                } catch (e) {
+                    showMsg(
+                        MsgType.warning,
+                        `Gradle wrapper exists but couldn't make it executable. Please run: chmod +x ${gradleCheck.path}`,
+                        {}
+                    );
+                }
+            }
+
+            const initScriptPath = this.getInitScriptPath(context);
+            try {
+                const variantsObj = await this.buildVariant.exec<AndroidBuildVariantsModel>(
+                    Command.load,
+                    initScriptPath,
+                    { cwd: this.workspacePath }
+                );
+                fs.unlinkSync(initScriptPath);
+
+                if (!variantsObj) {
+                    return defaultVariants;
+                }
+
+                const variants: MuduleBuildVariant[] = [];
+
+                Object.entries(variantsObj.modules).forEach(([module, moduleObj]) => {
+                    const moduleData = moduleObj as Module;
+                    variants.push({
+                        module: module,
+                        type: moduleData.type,
+                        variants: moduleData.variants,
+                    });
                 });
-            });
-            out = variants;
-            // Cache for 5 minutes (300 seconds)
-            this.setCache("getModuleBuildVariants", out, 300);
+                out = variants;
+                // Cache for 5 minutes (300 seconds)
+                this.setCache("getModuleBuildVariants", out, 300);
+            } catch (error: any) {
+                fs.unlinkSync(initScriptPath);
+                const errorMessage = error?.message || String(error);
+                if (errorMessage.includes('No such file or directory') || errorMessage.includes('gradlew')) {
+                    showMsg(
+                        MsgType.error,
+                        `Gradle wrapper not found or not executable.\n\nError: ${errorMessage}\n\nMake sure you're in an Android project root directory with a gradlew file.`,
+                        {}
+                    );
+                } else {
+                    showMsg(
+                        MsgType.error,
+                        `Failed to load build variants.\n\nError: ${errorMessage}`,
+                        {}
+                    );
+                }
+                return defaultVariants;
+            }
         }
         return out;
     }

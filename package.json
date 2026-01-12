@@ -21,6 +21,7 @@
     "onView:android-studio-lite-avd",
     "onView:android-studio-lite-build-variant",
     "onCommand:android-studio-lite.avdlist-refresh",
+    "onCommand:android-studio-lite.setup-wizard",
     "onCommand:android-studio-lite.setup-sdkpath",
     "onCommand:android-studio-lite.setup-avdmanager",
     "onCommand:android-studio-lite.setup-emulator"
@@ -164,6 +165,12 @@
         "command": "android-studio-lite.avd-delete",
         "title": "Delete",
         "icon": "$(trash)"
+      },
+      {
+        "command": "android-studio-lite.setup-wizard",
+        "title": "Run Setup Wizard",
+        "category": "Android Studio Lite",
+        "icon": "$(wrench)"
       },
       {
         "command": "android-studio-lite.setup-sdkpath",
