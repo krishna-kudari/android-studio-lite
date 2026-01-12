@@ -17,6 +17,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     private readonly disposables: Disposable[] = [];
     private readonly manager: Manager;
     private buildCancellationTokens = new Map<string, CancellationTokenSource>();
+    private logcatActive: boolean = false;
 
     constructor(
         private readonly host: WebviewHost,
@@ -47,6 +48,15 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         }
         const selectedModule = modules.length > 0 ? modules[0].module : undefined;
 
+        // Check current logcat state
+        try {
+            // Try to check if logcat is running by checking if Logcat output channel exists and is visible
+            // This is a best-effort check since we don't have direct access to LogcatProvider
+            this.logcatActive = false; // Default to false, will be updated when user toggles
+        } catch (error) {
+            console.error('[AVDSelectorProvider] Error checking logcat state:', error);
+        }
+
         return {
             ...this.host.baseWebviewState,
             avds: avdList,
@@ -61,6 +71,8 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         // Send initial AVD list and modules
         await this.sendAVDList();
         await this.sendModules();
+        // Send initial logcat state
+        await this.host.notify('logcat-state-changed', { active: this.logcatActive });
     }
 
     onMessageReceived?(e: any): void {
@@ -82,6 +94,8 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
             void this.handleRunApp(e.params);
         } else if (e.type === 'cancel-build') {
             void this.handleCancelBuild(e.params);
+        } else if (e.type === 'toggle-logcat') {
+            void this.handleToggleLogcat(e.params);
         }
     }
 
@@ -226,6 +240,33 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                 this.buildCancellationTokens.delete(cancellationToken);
                 await this.host.notify('build-cancelled', {});
             }
+        }
+    }
+
+    private async handleToggleLogcat(params: any): Promise<void> {
+        const { active } = params || {};
+        this.logcatActive = active;
+
+        try {
+            if (active) {
+                // Start logcat and show logcat output channel
+                await commands.executeCommand('android-studio-lite.startLogcat');
+                // Hide Android Studio Lite output channel
+                this.manager.output.hide();
+            } else {
+                // Stop logcat and show Android Studio Lite output channel
+                await commands.executeCommand('android-studio-lite.stopLogcat');
+                // Show Android Studio Lite output channel
+                this.manager.output.show();
+            }
+            // Notify webview of state change
+            await this.host.notify('logcat-state-changed', { active: this.logcatActive });
+        } catch (error: any) {
+            console.error('[AVDSelectorProvider] Error toggling logcat:', error);
+            // Revert state on error
+            this.logcatActive = !active;
+            await this.host.notify('logcat-state-changed', { active: this.logcatActive });
+            window.showErrorMessage(`Failed to ${active ? 'start' : 'stop'} logcat: ${error.message || String(error)}`);
         }
     }
 

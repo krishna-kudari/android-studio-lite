@@ -69,33 +69,18 @@ export function parseLogcatLine(line: string): LogcatLine | null {
     };
 }
 
-/**
- * Get ANSI color code for log level
- * Uses colors similar to Android Studio's logcat viewer
- */
-export function getLogLevelColor(level: LogLevel): string {
-    switch (level) {
-        case LogLevel.ERROR:
-        case LogLevel.FATAL:
-            return '\x1b[31m'; // Red - for errors
-        case LogLevel.WARN:
-            return '\x1b[33m'; // Yellow/Orange - for warnings
-        case LogLevel.INFO:
-            return '\x1b[36m'; // Cyan/Blue - for info
-        case LogLevel.DEBUG:
-            return '\x1b[90m'; // Gray - for debug
-        case LogLevel.VERBOSE:
-            return '\x1b[37m'; // Light Gray/White - for verbose
-        default:
-            return '\x1b[0m'; // Reset
-    }
-}
 
 /**
- * Format logcat line to match Android Studio format with colors
+ * Format logcat line to match Android Studio format exactly
  * Format: YYYY-MM-DD HH:MM:SS.mmm  PID-TID  Tag(padded)  Package(padded)  Level  Message
+ * Example: "2026-01-12 20:35:22.617 13781-13781 _fastlane_ci_c          com.krishna.github_fastlane_ci_cd    W  Accessing hidden method..."
  */
-export function formatLogcatLine(logLine: LogcatLine, showTimestamp: boolean = true, showPid: boolean = false, useColors: boolean = true): string {
+export function formatLogcatLine(logLine: LogcatLine, showTimestamp: boolean = true, showPid: boolean = false, useColors: boolean = false): string {
+    // If no timestamp, return message as-is (for lines like "--------- beginning of main")
+    if (!logLine.timestamp && !showTimestamp) {
+        return logLine.message || logLine.raw;
+    }
+
     // Convert timestamp to full date format (YYYY-MM-DD HH:MM:SS.mmm)
     let timestampStr = '';
     if (showTimestamp && logLine.timestamp) {
@@ -113,39 +98,49 @@ export function formatLogcatLine(logLine: LogcatLine, showTimestamp: boolean = t
         }
     }
 
-    // Format PID-TID
+    // If no timestamp after processing, return message as-is
+    if (!timestampStr) {
+        return logLine.message || logLine.raw;
+    }
+
+    // Format PID-TID (pad to 11 characters, right-aligned with spaces)
     let pidTidStr = '';
     if (logLine.pid && logLine.tid) {
         pidTidStr = `${logLine.pid}-${logLine.tid}`;
     } else if (logLine.pid) {
         pidTidStr = logLine.pid;
     }
+    // Pad to 11 characters (Android Studio format) - right align
+    const pidTidPadded = pidTidStr.padStart(11);
 
-    // Pad tag to 24 characters (Android Studio uses ~24)
+    // Pad tag to 24 characters (Android Studio uses 24) - left align
     const tagPadded = logLine.tag.padEnd(24).substring(0, 24);
 
-    // Pad package name to 30 characters (Android Studio uses ~30)
+    // Pad package name to 30 characters (Android Studio uses 30) - left align
     const packagePadded = (logLine.packageName || '').padEnd(30).substring(0, 30);
 
-    // Level is single letter - apply color
-    const levelColor = useColors ? getLogLevelColor(logLine.level) : '';
-    const resetColor = useColors ? '\x1b[0m' : '';
-    const levelStr = `${levelColor}${logLine.level}${resetColor}`;
-
-    // Build the formatted line with colors
+    // Build the formatted line exactly like Android Studio
+    // Format: timestamp pid-tid tag package level message
     const parts: string[] = [];
-    if (timestampStr) parts.push(timestampStr);
-    if (pidTidStr) parts.push(` ${pidTidStr.padStart(11)}`); // Pad PID-TID to 11 chars
-    if (tagPadded) parts.push(` ${tagPadded}`);
-    if (packagePadded) parts.push(` ${packagePadded}`);
-    if (levelStr) parts.push(` ${levelStr}`);
+
+    // Timestamp column (no leading space)
+    parts.push(timestampStr);
+
+    // PID-TID column (space before, padded to 11 chars, right-aligned)
+    parts.push(` ${pidTidPadded}`);
+
+    // Tag column (space before, padded to 24 chars, left-aligned)
+    parts.push(` ${tagPadded}`);
+
+    // Package column (space before, padded to 30 chars, left-aligned)
+    parts.push(` ${packagePadded}`);
+
+    // Level column (space before, single character)
+    parts.push(` ${logLine.level}`);
+
+    // Message column (space before, no padding)
     if (logLine.message) {
-        // Optionally color the message based on level (lighter color)
-        if (useColors && (logLine.level === LogLevel.ERROR || logLine.level === LogLevel.FATAL)) {
-            parts.push(` ${levelColor}${logLine.message}${resetColor}`);
-        } else {
-            parts.push(` ${logLine.message}`);
-        }
+        parts.push(` ${logLine.message}`);
     }
 
     return parts.join('');

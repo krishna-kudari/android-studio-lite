@@ -4,6 +4,7 @@ import { ASlElement } from '../shared/components/element.js';
 import { elementBase } from '../shared/components/styles/base.css.js';
 import '../shared/components/dropdown.js';
 import '../shared/components/button.js';
+import '../shared/components/toggle-button.js';
 import type { DropdownOption } from '../shared/components/dropdown.js';
 
 const playIcon = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -89,6 +90,10 @@ export class ASlAVDSelectorApp extends ASlElement {
 			.button-group asl-button {
 				flex: 1;
 			}
+
+			.button-group asl-toggle-button {
+				flex: 0 0 auto;
+			}
 		`,
     ];
 
@@ -109,6 +114,9 @@ export class ASlAVDSelectorApp extends ASlElement {
 
     @state()
     private buildCancellable: boolean = false;
+
+    @state()
+    private logcatActive: boolean = false;
 
     private vscode: any;
     private buildCancellationToken: string | null = null;
@@ -191,6 +199,18 @@ export class ASlAVDSelectorApp extends ASlElement {
         }
     }
 
+    private handleLogcatToggle(e: CustomEvent) {
+        const { checked } = e.detail;
+        this.logcatActive = checked;
+
+        if (this.vscode) {
+            this.vscode.postMessage({
+                type: 'toggle-logcat',
+                params: { active: checked },
+            });
+        }
+    }
+
     private handleMessage = (event: MessageEvent) => {
         const message = event.data;
         switch (message.type) {
@@ -249,6 +269,12 @@ export class ASlAVDSelectorApp extends ASlElement {
                 this.isBuilding = false;
                 this.buildCancellable = false;
                 this.buildCancellationToken = null;
+                break;
+            case 'logcat-state-changed':
+                const { active } = message.params || {};
+                if (typeof active === 'boolean') {
+                    this.logcatActive = active;
+                }
                 break;
         }
     };
@@ -349,6 +375,11 @@ export class ASlAVDSelectorApp extends ASlElement {
 						?disabled=${!this.buildCancellable}
 						@button-click=${this.handleCancelClick}
 					></asl-button>
+					<asl-toggle-button
+						label="Logcat"
+						?checked=${this.logcatActive}
+						@toggle-click=${this.handleLogcatToggle}
+					></asl-toggle-button>
 				</div>
 			</div>
 		`;
