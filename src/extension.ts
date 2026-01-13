@@ -1,3 +1,4 @@
+import 'reflect-metadata'; // Required for tsyringe decorators
 import * as vscode from 'vscode';
 import { AVDTreeView } from './ui/AVDTreeView';
 import { BuildVariantTreeView } from './ui/BuildVariantTreeView';
@@ -5,6 +6,7 @@ import { Manager, ConfigItem } from './core';
 import { subscribe } from './module/';
 import { WebviewsController } from './webviews/webviewsController';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
+import { setupContainer, resolve, TYPES } from './di';
 
 // Import logcat commands and provider from compiled output
 const logcatCommands = require('../out/commands/logcatCommands');
@@ -15,8 +17,19 @@ const AdbService = require('../out/services/adbService').AdbService;
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
 
-	// Initialize Manager (core singleton)
+	// Initialize Dependency Injection Container
+	// This registers all services and their dependencies
+	const container = setupContainer(context);
+	console.log('Dependency Injection container initialized');
+
+	// Get Manager instance (can use DI or singleton pattern)
+	// Option 1: Use DI container (recommended for new code)
+	// const manager = resolve<Manager>(TYPES.Manager);
+
+	// Option 2: Use singleton pattern (backward compatible)
 	const manager = Manager.getInstance();
+
+	// Initialize Android service check
 	await manager.android.initCheck();
 
 	// Register AVD Selector webview view using new architecture
