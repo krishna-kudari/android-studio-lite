@@ -10,21 +10,14 @@
   },
   "icon": "assets/android-studio-macos-transparent.png",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
+    "Debuggers",
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onView:android-studio-lite-avd-dropdown",
-    "onView:android-studio-lite-avd",
-    "onView:android-studio-lite-build-variant",
-    "onCommand:android-studio-lite.avdlist-refresh",
-    "onCommand:android-studio-lite.setup-wizard",
-    "onCommand:android-studio-lite.setup-sdkpath",
-    "onCommand:android-studio-lite.setup-avdmanager",
-    "onCommand:android-studio-lite.setup-emulator"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
