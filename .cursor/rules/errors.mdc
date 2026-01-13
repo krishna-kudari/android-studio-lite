@@ -1,0 +1,556 @@
+---
+description: Implementing any thing which can throw errors apply this info for better error handling.
+alwaysApply: false
+---
+# Error Handling Usage Guide
+
+This guide explains how to use the error handling system in Android Studio Lite.
+
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [Error Types](#error-types)
+3. [ErrorHandler Usage](#errorhandler-usage)
+4. [Integration Examples](#integration-examples)
+5. [Best Practices](#best-practices)
+
+---
+
+## Quick Start
+
+### 1. Import Error Classes
+
+```typescript
+import { ErrorHandler, ConfigError, ServiceError, CommandError } from './errors';
+```
+
+### 2. Throw Specific Errors
+
+```typescript
+// Configuration error
+if (!sdkPath) {
+    throw new ConfigError(
+        'Android SDK path is not configured',
+        'android-studio-lite.sdkPath',
+        {
+            context: { workspace: workspaceFolder?.uri.fsPath },
+            shouldShowToUser: true
+        }
+    );
+}
+
+// Service error
+try {
+    await someServiceOperation();
+} catch (error) {
+    throw new ServiceError(
+        'Failed to execute service operation',
+        'AndroidService',
+        { cause: error }
+    );
+}
+```
+
+### 3. Handle Errors
+
+```typescript
+try {
+    await someOperation();
+} catch (error) {
+    await ErrorHandler.handle(error, 'MyService');
+}
+```
+
+---
+
+## Error Types
+
+### AppError (Base Class)
+
+All custom errors extend `AppError`. It provides:
+- `code`: Unique error code
+- `severity`: 'error' | 'warning' | 'info'
+- `context`: Additional context information
+- `shouldLog`: Whether to log the error
+- `shouldShowToUser`: Whether to show to user
+
+### ConfigError
+
+For configuration-related errors.
+
+```typescript
+throw new ConfigError(
+    'SDK path is invalid',
+    'android-studio-lite.sdkPath',
+    {
+        context: { path: '/invalid/path' },
+        shouldShowToUser: true
+    }
+);
+```
+
+### ServiceError
+
+For service operation failures.
+
+```typescript
+throw new ServiceError(
+    'Failed to list AVDs',
+    'AVDService',
+    {
+        cause: originalError,
+        context: { command: 'list avd' }
+    }
+);
+```
+
+### CommandError
+
+For command execution failures.
+
+```typescript
+throw new CommandError(
+    'Command execution failed',
+    'android-studio-lite.startLogcat',
+    {
+        cause: execError,
+        context: { deviceId: 'emulator-5554' }
+    }
+);
+```
+
+### ValidationError
+
+For validation failures (typically warnings).
+
+```typescript
+throw new ValidationError(
+    'Invalid device ID format',
+    'deviceId',
+    {
+        context: { value: 'invalid-id' },
+        shouldShowToUser: true
+    }
+);
+```
+
+### NetworkError
+
+For network operation failures.
+
+```typescript
+throw new NetworkError(
+    'Failed to download SDK component',
+    'https://example.com/download',
+    404,
+    {
+        cause: fetchError
+    }
+);
+```
+
+---
+
+## ErrorHandler Usage
+
+### Basic Usage
+
+```typescript
+try {
+    await someOperation();
+} catch (error) {
+    await ErrorHandler.handle(error, 'ServiceName');
+}
+```
+
+### With Options
+
+```typescript
+await ErrorHandler.handle(error, 'MyService', {
+    showToUser: true,  // Override error's shouldShowToUser
+    log: true,         // Override error's shouldLog
+    actions: ['Retry', 'Cancel']  // Custom action buttons
+});
+```
+
+### Wrapping Functions
+
+Wrap async functions to automatically handle errors:
+
+```typescript
+// Wrap a command handler
+const safeHandler = ErrorHandler.wrap(async () => {
+    await someAsyncOperation();
+}, 'MyCommand');
+
+vscode.commands.registerCommand('my.command', safeHandler);
+```
+
+Wrap synchronous functions:
+
+```typescript
+const safeFunction = ErrorHandler.wrapSync(() => {
+    return someSyncOperation();
+}, 'MyFunction');
+```
+
+---
+
+## Integration Examples
+
+### Example 1: Service Method
+
+```typescript
+import { ServiceError, ErrorHandler } from '../errors';
+
+export class AndroidService extends Service {
+    public async checkAVDManager(): Promise<void> {
+        try {
+            const exec = this.getAVDManager();
+            if (!exec || exec === '') {
+                throw new ConfigError(
+                    'AVD Manager executable not found',
+                    'android-studio-lite.executable',
+                    {
+                        context: {
+                            sdkPath: this.getConfig().sdkPath,
+                            cmdPath: this.getConfig().cmdPath
+                        }
+                    }
+                );
+            }
+
+            await execWithMsg(this.manager, false, exec + " list avd");
+        } catch (error) {
+            if (error instanceof ConfigError || error instanceof ServiceError) {
+                throw error; // Re-throw our custom errors
+            }
+
+            // Wrap unknown errors
+            throw new ServiceError(
+                'Failed to check AVD Manager',
+                'AndroidService',
+                {
+                    cause: error instanceof Error ? error : new Error(String(error)),
+                    context: { method: 'checkAVDManager' }
+                }
+            );
+        }
+    }
+}
+```
+
+### Example 2: Command Handler
+
+```typescript
+import { CommandError, ErrorHandler } from '../errors';
+
+vscode.commands.registerCommand(
+    'android-studio-lite.setup-sdkpath',
+    ErrorHandler.wrap(async () => {
+        try {
+            const manager = Manager.getInstance();
+            await manager.android.updatePathDiag(
+                "dir",
+                ConfigItem.sdkPath,
+                "Please select the Android SDK Root Path",
+                "Android SDK Root path updated!",
+                "Android SDK path not specified!"
+            );
+        } catch (error) {
+            throw new CommandError(
+                'Failed to update SDK path',
+                'android-studio-lite.setup-sdkpath',
+                {
+                    cause: error instanceof Error ? error : new Error(String(error))
+                }
+            );
+        }
+    }, 'Setup SDK Path')
+);
+```
+
+### Example 3: Validation
+
+```typescript
+import { ValidationError } from '../errors';
+
+function validateDeviceId(deviceId: string): void {
+    if (!deviceId || deviceId.trim() === '') {
+        throw new ValidationError(
+            'Device ID cannot be empty',
+            'deviceId',
+            {
+                shouldShowToUser: true,
+                shouldLog: false  // Don't log validation errors
+            }
+        );
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(deviceId)) {
+        throw new ValidationError(
+            'Device ID contains invalid characters',
+            'deviceId',
+            {
+                context: { value: deviceId },
+                shouldShowToUser: true
+            }
+        );
+    }
+}
+```
+
+### Example 4: Error Propagation
+
+```typescript
+// In a service method
+public async initCheck(): Promise<void> {
+    try {
+        // ... initialization logic
+
+        await this.checkAVDManager();
+    } catch (error) {
+        // Add context and re-throw
+        if (error instanceof ConfigError) {
+            throw new ConfigError(
+                `Initialization failed: ${error.message}`,
+                error.configKey,
+                {
+                    cause: error,
+                    context: {
+                        ...error.context,
+                        phase: 'initCheck'
+                    }
+                }
+            );
+        }
+
+        throw error;
+    }
+}
+
+// In extension.ts
+try {
+    await manager.android.initCheck();
+} catch (error) {
+    await ErrorHandler.handle(error, 'Extension Activation');
+}
+```
+
+---
+
+## Best Practices
+
+### 1. Use Specific Error Types
+
+✅ **Good:**
+```typescript
+throw new ConfigError('SDK path not found', 'sdkPath');
+```
+
+❌ **Bad:**
+```typescript
+throw new Error('SDK path not found');
+```
+
+### 2. Provide Context
+
+✅ **Good:**
+```typescript
+throw new ServiceError(
+    'Failed to execute command',
+    'AVDService',
+    {
+        context: {
+            command: 'list avd',
+            sdkPath: config.sdkPath,
+            timestamp: Date.now()
+        }
+    }
+);
+```
+
+❌ **Bad:**
+```typescript
+throw new ServiceError('Failed');
+```
+
+### 3. Preserve Original Errors
+
+✅ **Good:**
+```typescript
+try {
+    await someOperation();
+} catch (error) {
+    throw new ServiceError(
+        'Operation failed',
+        'MyService',
+        { cause: error }
+    );
+}
+```
+
+❌ **Bad:**
+```typescript
+try {
+    await someOperation();
+} catch (error) {
+    throw new ServiceError('Operation failed', 'MyService');
+    // Lost original error information
+}
+```
+
+### 4. Handle Errors at Appropriate Levels
+
+- **Service Layer**: Throw specific errors with context
+- **Command Handlers**: Use `ErrorHandler.wrap()` or handle and show to user
+- **Extension Activation**: Handle all errors and log them
+
+### 5. Don't Over-Handle
+
+✅ **Good:**
+```typescript
+// Let errors propagate to command handler
+public async checkAVDManager(): Promise<void> {
+    const exec = this.getAVDManager();
+    if (!exec) {
+        throw new ConfigError('AVD Manager not found');
+    }
+    await execWithMsg(this.manager, false, exec + " list avd");
+}
+```
+
+❌ **Bad:**
+```typescript
+// Handling errors at every level
+public async checkAVDManager(): Promise<void> {
+    try {
+        const exec = this.getAVDManager();
+        if (!exec) {
+            await ErrorHandler.handle(new ConfigError('...'));
+            return;
+        }
+        try {
+            await execWithMsg(...);
+        } catch (error) {
+            await ErrorHandler.handle(error);
+        }
+    } catch (error) {
+        await ErrorHandler.handle(error);
+    }
+}
+```
+
+### 6. Use Error Severity Appropriately
+
+- **error**: Something went wrong, user action may be needed
+- **warning**: Something is not ideal but can continue
+- **info**: Informational message
+
+### 7. Test Error Handling
+
+```typescript
+// In tests
+it('should throw ConfigError when SDK path is missing', async () => {
+    // Arrange
+    const service = new AndroidService(manager);
+
+    // Act & Assert
+    await expect(service.checkAVDManager()).rejects.toThrow(ConfigError);
+    await expect(service.checkAVDManager()).rejects.toThrow('SDK path');
+});
+```
+
+---
+
+## Migration Checklist
+
+When migrating existing error handling:
+
+- [ ] Replace `console.error()` with `ErrorHandler.handle()`
+- [ ] Replace generic `Error` with specific error types
+- [ ] Add context information to errors
+- [ ] Use `ErrorHandler.wrap()` for command handlers
+- [ ] Update try-catch blocks to use new error types
+- [ ] Test error scenarios
+
+---
+
+## Common Patterns
+
+### Pattern 1: Validation → Operation → Error Handling
+
+```typescript
+public async executeOperation(input: string): Promise<void> {
+    // Validate
+    if (!input) {
+        throw new ValidationError('Input is required', 'input');
+    }
+
+    // Execute
+    try {
+        await this.performOperation(input);
+    } catch (error) {
+        throw new ServiceError(
+            'Operation failed',
+            'MyService',
+            { cause: error, context: { input } }
+        );
+    }
+}
+```
+
+### Pattern 2: Error Transformation
+
+```typescript
+try {
+    await externalApiCall();
+} catch (error) {
+    // Transform external errors to our error types
+    if (error instanceof NetworkError) {
+        throw new ServiceError(
+            'External service unavailable',
+            'MyService',
+            { cause: error }
+        );
+    }
+    throw error;
+}
+```
+
+### Pattern 3: Silent Errors (Log Only)
+
+```typescript
+try {
+    await optionalOperation();
+} catch (error) {
+    // Log but don't show to user
+    await ErrorHandler.handle(error, 'MyService', {
+        showToUser: false,
+        log: true
+    });
+}
+```
+
+---
+
+## Troubleshooting
+
+### Error not showing to user?
+
+- Check `shouldShowToUser` property
+- Check `ErrorHandler.handle()` options
+- Verify ErrorHandler is initialized with output channel
+
+### Error not logging?
+
+- Check `shouldLog` property
+- Verify `ErrorHandler.setOutputChannel()` was called
+- Check output channel is visible
+
+### Stack trace missing?
+
+- Ensure `cause` is an Error instance
+- Check Error.captureStackTrace is available (V8 only)
+
+---
