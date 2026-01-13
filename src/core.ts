@@ -8,25 +8,14 @@ import { Cache } from "./module/cache";
 import { Platform } from "./module/platform";
 import { BuildVariantService } from "./service/BuildVariantService";
 import { GradleService } from "./service/GradleService";
+import { ConfigService, ConfigScope as NewConfigScope, type IConfig as IConfigFromService } from './config';
+import { ConfigKeys } from './config/ConfigKeys';
 
-export interface IConfig {
-    /** PATHS */
-    sdkPath: string
-    cmdPath: string
-    avdHome: string
-    buildToolPath: string
-    platformToolsPath: string
-    emuPath: string
-
-    /** exe */
-    cmdVersion: string
-    executable?: string
-    emulator?: string
-    sdkManager?: string
-
-    /** opts */
-    emulatorOpt?: string
-}
+/**
+ * Configuration interface (re-exported from config module for backward compatibility).
+ * @deprecated Use IConfig from './config' instead.
+ */
+export type IConfig = IConfigFromService;
 
 export enum ConfigItem {
     sdkPath = "sdkPath",
@@ -38,12 +27,60 @@ export enum ConfigItem {
     sdkManager = "sdkManager",
 }
 
+/**
+ * Configuration scope enum (kept for backward compatibility).
+ * Maps to ConfigScope from config module.
+ */
 export enum ConfigScope {
     global = 1,
     workspace = 2,
     folder = 3,
     globalnWorkspace = 4,
     globalnfolder = 5,
+}
+
+/**
+ * Map old ConfigScope to new ConfigScope.
+ */
+function mapConfigScope(scope: ConfigScope): NewConfigScope {
+    switch (scope) {
+        case ConfigScope.global:
+            return NewConfigScope.Global;
+        case ConfigScope.workspace:
+            return NewConfigScope.Workspace;
+        case ConfigScope.folder:
+            return NewConfigScope.Folder;
+        case ConfigScope.globalnWorkspace:
+            return NewConfigScope.GlobalAndWorkspace;
+        case ConfigScope.globalnfolder:
+            return NewConfigScope.GlobalAndFolder;
+        default:
+            return NewConfigScope.Folder;
+    }
+}
+
+/**
+ * Map ConfigItem to ConfigKey.
+ */
+function mapConfigItem(item: ConfigItem): string {
+    switch (item) {
+        case ConfigItem.sdkPath:
+            return ConfigKeys.SDK_PATH;
+        case ConfigItem.avdHome:
+            return ConfigKeys.AVD_HOME;
+        case ConfigItem.cmdVersion:
+            return ConfigKeys.CMD_VERSION;
+        case ConfigItem.executable:
+            return ConfigKeys.EXECUTABLE;
+        case ConfigItem.emulator:
+            return ConfigKeys.EMULATOR_PATH;
+        case ConfigItem.emulatorOpt:
+            return ConfigKeys.EMULATOR_OPT;
+        case ConfigItem.sdkManager:
+            return ConfigKeys.SDK_MANAGER;
+        default:
+            return `android-studio-lite.${item}`;
+    }
 }
 
 export class Manager {
@@ -61,9 +98,11 @@ export class Manager {
     readonly gradle: GradleService;
     readonly output: Output;
     readonly cache: Cache;
+    readonly config: ConfigService;
 
     private constructor() {
         this.cache = new Cache();
+        this.config = new ConfigService();
 
         this.android = new AndroidService(this);
         this.avd = new AVDService(this);
@@ -73,85 +112,24 @@ export class Manager {
     }
 
     /**
-     * setConfig
-     * @param key string
-     * @param value any
-     * @param scope ConfigScope
+     * Set configuration value (delegates to ConfigService).
+     * @param key Configuration key (can be ConfigItem enum or string)
+     * @param value Configuration value
+     * @param scope Configuration scope
+     * @deprecated Use manager.config.set() directly with ConfigKeys for better type safety.
      */
-    public async setConfig(key: string, value: any, scope: ConfigScope = ConfigScope.folder) {
-        let config = workspace.getConfiguration('android-studio-lite');
-
-        if (scope === ConfigScope.global) {
-            await config.update(key, value, true);
-
-        } else if (scope === ConfigScope.workspace) {
-            await config.update(key, value, false);
-
-        } else if (scope === ConfigScope.folder) {
-            await config.update(key, value, undefined);
-
-        } else if (scope === ConfigScope.globalnWorkspace) {
-            await config.update(key, value, true);
-            await config.update(key, value, false);
-
-        } else if (scope === ConfigScope.globalnfolder) {
-            await config.update(key, value, true);
-            await config.update(key, value, undefined);
-
-        }
+    public async setConfig(key: string | ConfigItem, value: any, scope: ConfigScope = ConfigScope.folder): Promise<void> {
+        const configKey = typeof key === 'string' ? key : mapConfigItem(key);
+        const newScope = mapConfigScope(scope);
+        await this.config.set(configKey as any, value, newScope);
     }
 
+    /**
+     * Get configuration (delegates to ConfigService).
+     * @deprecated Use manager.config.getConfig() or specific getters for better type safety.
+     */
     public getConfig(): IConfig {
-        let config = workspace.getConfiguration('android-studio-lite');
-
-        //SDK Root
-        let sysSdkRoot = process.env.ANDROID_SDK_ROOT ?? "";
-        let androidHomeVal = process.env.ANDROID_HOME ?? "";
-        if (androidHomeVal !== "") {
-            sysSdkRoot = androidHomeVal;
-        }
-        let sdkPath = config.get<string>(ConfigItem.sdkPath, sysSdkRoot);
-        if (sdkPath === "") { //replace the env value if config is empty
-            sdkPath = sysSdkRoot;
-        }
-        console.log(`ENV SDK PATH: ${sysSdkRoot}`);
-        console.log(`Final SDK PATH: ${sdkPath}`);
-
-        //AVD Home
-        let envAvdHome = process.env.ANDROID_AVD_HOME ?? "";
-        console.log(`ENV AVD Home PATH: ${envAvdHome}`);
-        let avdHome = config.get<string>(ConfigItem.avdHome, envAvdHome);
-        console.log(`Config AVD Home PATH: ${avdHome}`);
-        if (avdHome === "") { //replace the env value if config is empty
-            avdHome = envAvdHome;
-        }
-        console.log(`Final AVD Home PATH: ${avdHome}`);
-
-        let cmdVersion = config.get<string>(ConfigItem.cmdVersion, "latest");
-
-        let cmdPath = path.join(sdkPath, "cmdline-tools", cmdVersion, "bin");
-        let buildToolPath = path.join(sdkPath, "build-tools");
-        let platformToolsPath = path.join(sdkPath, "platform-tools");
-        let emuPath = path.join(sdkPath, "emulator");
-
-        let executable = config.get<string>(ConfigItem.executable, "avdmanager");
-        let sdkManager = config.get<string>(ConfigItem.sdkManager, "sdkmanager");
-        let emulator = config.get<string>(ConfigItem.emulator, "emulator");
-
-        return {
-            sdkPath: sdkPath,
-            cmdPath: cmdPath,
-            avdHome: avdHome,
-            buildToolPath: buildToolPath,
-            platformToolsPath: platformToolsPath,
-            emuPath: emuPath,
-
-            cmdVersion: cmdVersion,
-            executable: executable,
-            sdkManager: sdkManager,
-            emulator: emulator,
-            emulatorOpt: config.get<string>(ConfigItem.emulatorOpt, "")
-        };
+        return this.config.getConfig();
     }
 
     public getPlatform() {
