@@ -16,7 +16,12 @@
     "useDefineForClassFields": false,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["src/*"],
+      "@webviews/*": ["src/webviews/*"]
+    }
   },
   "exclude": [
     "node_modules",

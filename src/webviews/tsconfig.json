@@ -15,14 +15,25 @@
     "useDefineForClassFields": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["../../*"],
+      "@webviews/*": ["./*"]
+    }
   },
   "include": [
-    "apps/shared/components/**/*"
+    "**/*.ts",
+    "**/*.tsx"
   ],
   "exclude": [
     "node_modules",
     "**/__tests__/**",
-    "**/utils/**/*"
+    "**/utils/**/*",
+    "**/*Provider.ts",
+    "**/webviewController.ts",
+    "**/webviewsController.ts",
+    "**/webviewProvider.ts",
+    "**/webviewDescriptors.ts"
   ]
 }

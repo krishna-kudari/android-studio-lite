@@ -363,13 +363,7 @@ export class ASlAVDSelectorApp extends ASlElement {
 						?disabled=${!this.selectedAVD || !this.selectedModule || this.isBuilding}
 						@button-click=${this.handleRunClick}
 					></asl-button>
-					<asl-button
-						variant="secondary"
-						icon="⏹"
-						label="Cancel"
-						?disabled=${!this.buildCancellable}
-						@button-click=${this.handleCancelClick}
-					></asl-button>
+					
 					<asl-toggle-button
 						label="Logcat"
 						?checked=${this.logcatActive}

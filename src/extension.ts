@@ -4,7 +4,7 @@ import { DependencyContainer } from 'tsyringe';
 import { AVDTreeView } from './avd/AVDTreeView';
 import { BuildVariantTreeView } from './buildVariant/BuildVariantTreeView';
 import { WebviewsController } from './webviews/webviewsController';
-import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
+import { AVDSelectorProvider } from './webviews/apps/avdSelector/avdSelectorProvider';
 import { setupContainer, resolve, TYPES } from './di';
 import { ExtensionConfig } from './onboarding/extensionConfig';
 import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboardingProvider';

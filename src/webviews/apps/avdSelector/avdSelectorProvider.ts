@@ -1,14 +1,14 @@
 import type { Disposable, ExtensionContext } from 'vscode';
 import { Disposable as VSCodeDisposable, window, commands, ProgressLocation, CancellationTokenSource } from 'vscode';
-import type { WebviewProvider, WebviewHost } from './webviewProvider.js';
-import type { WebviewState } from './protocol.js';
-import type { AVD } from '../cmd/AVDManager';
-import type { MuduleBuildVariant } from '../service/BuildVariantService';
-import { AVDService } from '../service/AVDService';
-import { BuildVariantService } from '../service/BuildVariantService';
-import { GradleService } from '../service/GradleService';
-import { Output } from '../module/output';
-import { ConfigService } from '../config';
+import type { WebviewProvider, WebviewHost } from '@webviews/webviewProvider';
+import type { WebviewState } from '@webviews/protocol';
+import type { AVD } from '@src/cmd/AVDManager';
+import type { MuduleBuildVariant } from '@src/service/BuildVariantService';
+import { AVDService } from '@src/service/AVDService';
+import { BuildVariantService } from '@src/service/BuildVariantService';
+import { GradleService } from '@src/service/GradleService';
+import { Output } from '@src/module/output';
+import { ConfigService } from '@src/config';
 
 export interface AVDSelectorWebviewState extends WebviewState {
     avds?: AVD[];

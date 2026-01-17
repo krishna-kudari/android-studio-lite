@@ -195,6 +195,8 @@ function getWebviewsConfig(mode, env, isProduction) {
         resolve: {
             alias: {
                 '@env': path.resolve(__dirname, 'src', 'env', 'browser'),
+                '@src': path.resolve(__dirname, 'src'),
+                '@webviews': path.resolve(__dirname, 'src', 'webviews'),
             },
             extensionAlias: { '.js': ['.ts', '.js'], '.jsx': ['.tsx', '.jsx'] },
             fallback: {},
