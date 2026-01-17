@@ -12,32 +12,29 @@ import { Output } from '../module/output';
 import { ADBExecutable, Command as AdbCommand } from '../cmd/ADB';
 import { parseDevicesOutput, Device } from '../utils/adbParser';
 
-export interface DeviceDetails {
-    name?: string;
-    androidVersion?: string;
-    avdName?: string;
+/**
+ * Unified model that combines AVD with its running device ID
+ * This is the single source of truth for AVD selection
+ */
+export interface AVDWithDevice extends AVD {
+    deviceId: string | null;  // Device ID when AVD is running (e.g., "emulator-5554")
+    isRunning: boolean;       // Convenience flag indicating if device is online
 }
-
-export interface EnrichedDevice extends Device, DeviceDetails {}
 
 @injectable()
 export class AVDService extends Service {
     readonly avdmanager: AVDManager;
     readonly emulator: Emulator;
     private readonly adbExecutable: ADBExecutable;
-    private selectedDeviceId: string | null = null;
-    private selectedAVDName: string | null = null;
-    private devices: EnrichedDevice[] = [];
+    private devices: Device[] = [];
     private devicePollingInterval: NodeJS.Timeout | null = null;
+
+    private selectedAVD: AVDWithDevice | null = null;
+
     private readonly deviceStateListeners = new Set<(state: {
-        selectedDeviceId: string | null;
-        selectedAVDName: string | null;
-        devices: EnrichedDevice[];
+        selectedAVD: AVDWithDevice | null;
+        devices: Device[];
     }) => void>();
-    private readonly STORAGE_KEY_DEVICE = 'selectedDeviceId';
-    private readonly STORAGE_KEY_AVD = 'selectedAVD';
-    private readonly DEVICE_LIST_CACHE_KEY = 'deviceList';
-    private readonly DEVICE_LIST_TTL_SECONDS = 300;
 
     constructor(
         @inject(TYPES.Cache) cache: Cache,
@@ -47,24 +44,24 @@ export class AVDService extends Service {
         @inject(TYPES.ExtensionContext) private readonly context: ExtensionContext
     ) {
         super(cache, configService, output);
-        // Create Executable instances with Output and executable paths
+
         const avdManagerPath = androidService.getAVDManager();
         const emulatorPath = androidService.getEmulator();
         this.avdmanager = new AVDManager(output, avdManagerPath);
         this.emulator = new Emulator(output, emulatorPath);
-        // Get ADB path from config, fallback to 'adb' if not configured
+
         const adbPath = configService.getAdbPath() || 'adb';
         this.adbExecutable = new ADBExecutable(output, adbPath);
-        this.loadSelectionState();
+        void this.loadSelectionState();
     }
 
-    async getAVDList(noCache: boolean = false) {
+    async getAVDList(noCache: boolean = false): Promise<AVD[]> {
         let out = this.getCache("getAVDList");
         if (!out || noCache) {
             out = this.avdmanager.exec<AVD>(avdcommand.listAvd);
             this.setCache("getAVDList", out);
         }
-        return out;
+        return out as AVD[];
     }
 
     async getAVDDeviceList(noCache: boolean = false) {
@@ -99,6 +96,7 @@ export class AVDService extends Service {
         }
         return this.avdmanager.exec<AVD>(avdcommand.create, avdname, path, imgname, extra);
     }
+
     async renameAVD(name: string, newName: string) {
         return this.avdmanager.exec<AVD>(avdcommand.rename, name, newName);
     }
@@ -132,90 +130,103 @@ export class AVDService extends Service {
 
     async refreshDevices(force: boolean = false): Promise<void> {
         if (!force) {
-            const cached = this.getCache(this.DEVICE_LIST_CACHE_KEY);
+            const cached = this.getCache(AVDService.DEVICE_LIST_CACHE_KEY);
             if (cached) {
                 this.devices = cached;
+                await this.updateSelectedAVDDeviceMapping();
                 this.notifyDeviceStateChanged();
                 return;
             }
         }
 
+        // Fetch devices from ADB (returns Device[] directly)
         const devices = await this.fetchDevicesFromAdb();
-        const enrichedDevices = await Promise.all(devices.map(async (device) => {
-            if (device.status === 'device') {
-                const details = await this.getDeviceDetails(device.id);
-                const enrichedDevice: EnrichedDevice = { ...device, ...details };
-                if (device.type === 'emulator' && details.avdName) {
-                    enrichedDevice.name = details.avdName;
-                }
-                return enrichedDevice;
-            }
-            return device as EnrichedDevice;
-        }));
 
-        this.devices = enrichedDevices;
-        this.setCache(this.DEVICE_LIST_CACHE_KEY, enrichedDevices, this.DEVICE_LIST_TTL_SECONDS);
+        this.devices = devices;
+        this.setCache(AVDService.DEVICE_LIST_CACHE_KEY, devices, AVDService.DEVICE_LIST_TTL_SECONDS);
 
-        // Validate selected device still exists
-        if (this.selectedDeviceId) {
-            const stillExists = enrichedDevices.some(d => d.id === this.selectedDeviceId && d.status === 'device');
-            if (!stillExists) {
-                this.selectedDeviceId = null;
-                this.saveSelectedDevice();
-            }
-        }
+        // Update selectedAVD with current device mapping
+        await this.updateSelectedAVDDeviceMapping();
 
-        // Auto-select based on AVD name if possible
-        if (!this.selectedDeviceId && this.selectedAVDName) {
-            const matching = enrichedDevices.find(d => d.status === 'device' && d.avdName === this.selectedAVDName);
-            if (matching) {
-                this.selectedDeviceId = matching.id;
-                this.saveSelectedDevice();
-            }
-        }
-
-        // Auto-select first device if config enabled
-        if (!this.selectedDeviceId && enrichedDevices.length > 0) {
+        // Auto-select first device if config enabled (for physical devices)
+        if (!this.selectedAVD && devices.length > 0) {
             const config = vscode.workspace.getConfiguration('android-studio-lite');
             const autoSelect = config.get('autoSelectDevice', false);
             if (autoSelect) {
-                const firstOnlineDevice = enrichedDevices.find(d => d.status === 'device');
-                if (firstOnlineDevice) {
-                    this.selectedDeviceId = firstOnlineDevice.id;
-                    this.saveSelectedDevice();
+                const firstOnlineDevice = devices.find(d => d.status === 'device');
+                if (firstOnlineDevice && firstOnlineDevice.type === 'emulator') {
+                    // Try to set AVD for emulator
+                    const avdName = await this.getDeviceAVDName(firstOnlineDevice.id);
+                    if (avdName) {
+                        await this.setSelectedAVD(avdName);
+                    }
                 }
-            }
-        }
-
-        // Sync selected AVD from selected device if needed
-        if (this.selectedDeviceId && !this.selectedAVDName) {
-            const selectedDevice = enrichedDevices.find(d => d.id === this.selectedDeviceId);
-            if (selectedDevice?.avdName) {
-                this.selectedAVDName = selectedDevice.avdName;
-                this.saveSelectedAVDName();
             }
         }
 
         this.notifyDeviceStateChanged();
     }
 
-    getDevices(): EnrichedDevice[] {
+    /**
+     * Update the device mapping for selected AVD
+     * Finds the running emulator device for the selected AVD and updates deviceId
+     * Uses the current devices list (doesn't refresh to avoid infinite loops)
+     */
+    private async updateSelectedAVDDeviceMapping(): Promise<void> {
+        if (!this.selectedAVD) {
+            return;
+        }
+
+        // Use current devices list instead of calling refreshDevices again
+        let matchingEmulator: Device | null = null;
+        for (const device of this.devices) {
+            if (device.type === 'emulator' && device.status === 'device') {
+                const deviceAVDName = await this.getDeviceAVDName(device.id);
+                // Compare AVD names (trim and case-insensitive for robustness)
+                const normalizedDeviceName = deviceAVDName?.trim().toLowerCase();
+                const normalizedSelectedName = this.selectedAVD.name.trim().toLowerCase();
+                if (normalizedDeviceName === normalizedSelectedName) {
+                    matchingEmulator = device;
+                    break;
+                }
+            }
+        }
+
+        if (matchingEmulator) {
+            // Update deviceId and isRunning flag
+            this.selectedAVD = {
+                ...this.selectedAVD,
+                deviceId: matchingEmulator.id,
+                isRunning: true,
+            };
+            await this.saveSelectedAVD();
+        } else {
+            // Device is not running
+            this.selectedAVD = {
+                ...this.selectedAVD,
+                deviceId: null,
+                isRunning: false,
+            };
+        }
+    }
+
+    getDevices(): Device[] {
         return this.devices;
     }
 
-    getOnlineDevices(): EnrichedDevice[] {
+    getOnlineDevices(): Device[] {
         return this.devices.filter(d => d.status === 'device');
     }
 
     getSelectedDeviceId(): string | null {
-        return this.selectedDeviceId;
+        return this.selectedAVD?.deviceId || null;
     }
 
-    getSelectedDevice(): EnrichedDevice | null {
-        if (!this.selectedDeviceId) {
+    getSelectedDevice(): Device | null {
+        if (!this.selectedAVD?.deviceId) {
             return null;
         }
-        return this.devices.find(d => d.id === this.selectedDeviceId && d.status === 'device') || null;
+        return this.devices.find(d => d.id === this.selectedAVD!.deviceId && d.status === 'device') || null;
     }
 
     async selectDevice(deviceId: string): Promise<void> {
@@ -233,57 +244,216 @@ export class AVDService extends Service {
             throw new Error(`Device "${deviceId}" is not online (status: ${device.status})`);
         }
 
-        this.selectedDeviceId = deviceId;
-        if (device.avdName) {
-            this.selectedAVDName = device.avdName;
-            this.saveSelectedAVDName();
+        // If device is an emulator, set selectedAVD with device mapping
+        if (device.type === 'emulator') {
+            const avdName = await this.getDeviceAVDName(deviceId);
+            if (avdName) {
+                await this.setSelectedAVD(avdName);
+                // Device mapping will be updated in refreshDevices/updateSelectedAVDDeviceMapping
+            }
         }
-        this.saveSelectedDevice();
+        // For physical devices, we don't set selectedAVD (it's AVD-specific)
+
         this.notifyDeviceStateChanged();
     }
 
     getSelectedAVDName(): string | null {
-        return this.selectedAVDName;
+        return this.selectedAVD?.name || null;
     }
 
-    async setSelectedAVDName(name: string | null): Promise<void> {
-        this.selectedAVDName = name;
-        this.saveSelectedAVDName();
-        await this.refreshDevices(false);
+    async setSelectedAVD(avd: string | AVD): Promise<void> {
+        let avdObject: AVD | null = null;
+
+        if (typeof avd === 'string') {
+            const avds = await this.getAVDList();
+            avdObject = avds.find(a => a.name === avd) || null;
+        } else {
+            avdObject = avd;
+        }
+
+        if (!avdObject) {
+            this.selectedAVD = null;
+            await this.saveSelectedAVD();
+            this.notifyDeviceStateChanged();
+            return;
+        }
+
+                // Create AVDWithDevice with initial device mapping
+                // Refresh devices first to ensure we have the latest device list
+                await this.refreshDevices(true);
+                const matchingEmulator = await this.getRunningEmulatorForAVD(avdObject.name, true);
+                this.selectedAVD = {
+                    ...avdObject,
+                    deviceId: matchingEmulator?.id || null,
+                    isRunning: matchingEmulator !== null,
+                };
+
+        await this.saveSelectedAVD();
+        this.notifyDeviceStateChanged();
     }
 
-    onDeviceStateChanged(cb: (state: { selectedDeviceId: string | null; selectedAVDName: string | null; devices: EnrichedDevice[] }) => void): Disposable {
+    getSelectedAVD(): AVDWithDevice | null {
+        return this.selectedAVD;
+    }
+
+    async getDeviceAVDName(deviceId: string): Promise<string | null> {
+        if (!deviceId.startsWith('emulator-')) return null;
+        try {
+            const avdName = await this.adbExecutable.exec<string>(
+                AdbCommand.emuAvdName,
+                deviceId
+            );
+            return avdName?.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
+    async getRunningEmulatorForAVD(avdName: string, skipRefresh: boolean = false): Promise<Device | null> {
+        // Only refresh if not already refreshing (to avoid infinite loops)
+        if (!skipRefresh) {
+            await this.refreshDevices(true);
+        }
+        for (const device of this.devices) {
+            if (device.type === 'emulator' && device.status === 'device') {
+                const deviceAVDName = await this.getDeviceAVDName(device.id);
+                // Compare AVD names (trim and case-insensitive for robustness)
+                if (deviceAVDName && deviceAVDName.trim().toLowerCase() === avdName.trim().toLowerCase()) {
+                    return device;
+                }
+            }
+        }
+        return null;
+    }
+
+    async getSelectedEmulatorDevice(): Promise<Device | null> {
+        if (!this.selectedAVD) return null;
+
+        // If deviceId is set, use it directly
+        if (this.selectedAVD.deviceId) {
+            const device = this.devices.find(d => d.id === this.selectedAVD!.deviceId && d.status === 'device');
+            if (device) return device;
+        }
+
+        // If deviceId is null or device not found, search for matching emulator
+        // This handles cases where device mapping wasn't updated yet
+        for (const device of this.devices) {
+            if (device.type === 'emulator' && device.status === 'device') {
+                const deviceAVDName = await this.getDeviceAVDName(device.id);
+                // Compare AVD names (trim and case-insensitive for robustness)
+                const normalizedDeviceName = deviceAVDName?.trim().toLowerCase();
+                const normalizedSelectedName = this.selectedAVD.name.trim().toLowerCase();
+                if (normalizedDeviceName === normalizedSelectedName) {
+                    // Update the mapping
+                    this.selectedAVD = {
+                        ...this.selectedAVD,
+                        deviceId: device.id,
+                        isRunning: true,
+                    };
+                    await this.saveSelectedAVD();
+                    return device;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    onDeviceStateChanged(cb: (state: { selectedAVD: AVDWithDevice | null; devices: Device[] }) => void): Disposable {
         this.deviceStateListeners.add(cb);
         return {
             dispose: () => this.deviceStateListeners.delete(cb),
         };
     }
 
-    private loadSelectionState(): void {
-        this.selectedDeviceId = this.context.workspaceState.get(this.STORAGE_KEY_DEVICE) || null;
-        this.selectedAVDName = this.context.workspaceState.get(this.STORAGE_KEY_AVD) || null;
-    }
+    private async loadSelectionState(): Promise<void> {
+        // Try new storage key first
+        const savedAVDName = this.context.workspaceState.get<string>(
+            AVDService.STORAGE_KEY_SELECTED_AVD
+        );
 
-    private saveSelectedDevice(): void {
-        if (this.selectedDeviceId) {
-            void this.context.workspaceState.update(this.STORAGE_KEY_DEVICE, this.selectedDeviceId);
-        } else {
-            void this.context.workspaceState.update(this.STORAGE_KEY_DEVICE, undefined);
+        if (savedAVDName) {
+            await this.loadAVDFromName(savedAVDName);
+            return;
+        }
+
+        // Migrate from old storage keys
+        const oldAVDName = this.context.workspaceState.get<string>(
+            AVDService.STORAGE_KEY_SELECTED_AVD
+        );
+        const oldDeviceId = this.context.workspaceState.get<string>(
+            AVDService.STORAGE_KEY_DEVICE
+        );
+
+        if (oldAVDName) {
+            await this.setSelectedAVD(oldAVDName);
+            // Clean up old keys
+            void this.context.workspaceState.update(AVDService.STORAGE_KEY_SELECTED_AVD, undefined);
+            void this.context.workspaceState.update(AVDService.STORAGE_KEY_DEVICE, undefined);
+        } else if (oldDeviceId) {
+            // Migrate from device ID: if it's an emulator, try to find AVD
+            await this.refreshDevices(true);
+            const device = this.devices.find(d => d.id === oldDeviceId);
+            if (device && device.type === 'emulator') {
+                const avdName = await this.getDeviceAVDName(oldDeviceId);
+                if (avdName) {
+                    await this.setSelectedAVD(avdName);
+                }
+            }
+            // Clean up old key
+            void this.context.workspaceState.update(AVDService.STORAGE_KEY_DEVICE, undefined);
         }
     }
 
-    private saveSelectedAVDName(): void {
-        if (this.selectedAVDName) {
-            void this.context.workspaceState.update(this.STORAGE_KEY_AVD, this.selectedAVDName);
+    private async loadAVDFromName(avdName: string): Promise<void> {
+        try {
+            const avds = await this.getAVDList();
+            const avd = avds.find(a => a.name === avdName);
+            if (avd) {
+                // Refresh devices first to get current device list
+                await this.refreshDevices(true);
+                // Create AVDWithDevice with device mapping using current devices
+                let matchingEmulator: Device | null = null;
+                for (const device of this.devices) {
+                    if (device.type === 'emulator' && device.status === 'device') {
+                        const deviceAVDName = await this.getDeviceAVDName(device.id);
+                        // Compare AVD names (trim and case-insensitive for robustness)
+                        if (deviceAVDName && deviceAVDName.trim().toLowerCase() === avdName.trim().toLowerCase()) {
+                            matchingEmulator = device;
+                            break;
+                        }
+                    }
+                }
+                this.selectedAVD = {
+                    ...avd,
+                    deviceId: matchingEmulator?.id || null,
+                    isRunning: matchingEmulator !== null,
+                };
+            }
+        } catch (error) {
+            console.error('[AVDService] Error loading AVD from name:', error);
+        }
+    }
+
+
+    private async saveSelectedAVD(): Promise<void> {
+        if (this.selectedAVD) {
+            // Store AVD name as string (AVD object may not be serializable)
+            await this.context.workspaceState.update(
+                AVDService.STORAGE_KEY_SELECTED_AVD,
+                this.selectedAVD.name
+            );
         } else {
-            void this.context.workspaceState.update(this.STORAGE_KEY_AVD, undefined);
+            await this.context.workspaceState.update(
+                AVDService.STORAGE_KEY_SELECTED_AVD,
+                undefined
+            );
         }
     }
 
     private notifyDeviceStateChanged(): void {
         const state = {
-            selectedDeviceId: this.selectedDeviceId,
-            selectedAVDName: this.selectedAVDName,
+            selectedAVD: this.selectedAVD,
             devices: this.devices,
         };
         this.deviceStateListeners.forEach(listener => listener(state));
@@ -306,28 +476,8 @@ export class AVDService extends Service {
         }
     }
 
-    /**
-     * Get device details (name, Android version, AVD name) using ADBExecutable
-     */
-    private async getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
-        try {
-            const [modelOutput, versionOutput, avdNameOutput] = await Promise.all([
-                this.adbExecutable.exec<string>(AdbCommand.shellGetprop, deviceId, 'ro.product.model').catch(() => ''),
-                this.adbExecutable.exec<string>(AdbCommand.shellGetprop, deviceId, 'ro.build.version.release').catch(() => ''),
-                // Try to get AVD name from emulator (only works for emulators)
-                deviceId.startsWith('emulator-')
-                    ? this.adbExecutable.exec<string>(AdbCommand.emuAvdName, deviceId).catch(() => '')
-                    : Promise.resolve('')
-            ]);
-
-            return {
-                name: modelOutput?.trim() || undefined,
-                androidVersion: versionOutput?.trim() || undefined,
-                avdName: avdNameOutput?.trim() || undefined
-            };
-        } catch (error) {
-            console.error('[AVDService] Error getting device details:', error);
-            return {};
-        }
-    }
+    public static readonly STORAGE_KEY_DEVICE = 'android-studio-lite.selectedDeviceId';
+    public static readonly STORAGE_KEY_SELECTED_AVD = 'android-studio-lite.selectedAVD';
+    public static readonly DEVICE_LIST_CACHE_KEY = 'android-studio-lite.deviceList';
+    public static readonly DEVICE_LIST_TTL_SECONDS = 300;
 }

@@ -9,6 +9,7 @@ import { Cache } from "../module/cache";
 import { AVDService } from "./AVDService";
 import { BuildVariantService } from "./BuildVariantService";
 import { ADBExecutable, Command } from "../cmd/ADB";
+import { Device } from "../utils/adbParser";
 
 @injectable()
 export class LogcatService extends Service {
@@ -48,46 +49,44 @@ export class LogcatService extends Service {
      * Start logcat streaming
      */
     async start(): Promise<void> {
-        // Refresh devices to ensure we have the latest device list
-        console.log('selected device', this.avdService.getSelectedDevice());
         await this.avdService.refreshDevices(true);
-        // Check if we have a selected device ID
-        let selectedDeviceId = this.avdService.getSelectedDeviceId();
 
-        // If no device ID but we have an AVD name, try to auto-select based on AVD name
-        if (!selectedDeviceId) {
-            console.log('no selected device id, trying to select based on AVD name');
-            const selectedAVDName = this.avdService.getSelectedAVDName();
-            if (selectedAVDName) {
-                // Refresh again to trigger auto-selection logic
-                await this.avdService.refreshDevices(true);
-                selectedDeviceId = this.avdService.getSelectedDeviceId();
+        // Try to get selected AVD first (preferred)
+        const selectedAVD = this.avdService.getSelectedAVD();
+        let selectedDevice: Device | null = null;
+
+        if (selectedAVD) {
+            // Use deviceId from unified model
+            if (selectedAVD.deviceId) {
+                selectedDevice = this.avdService.getSelectedDevice();
+            }
+
+            // If deviceId is null but AVD is selected, try to find the running device
+            // This handles the case where device mapping wasn't updated yet
+            if (!selectedDevice) {
+                selectedDevice = await this.avdService.getSelectedEmulatorDevice();
+            }
+
+            if (!selectedDevice) {
+                vscode.window.showWarningMessage(
+                    `AVD ${selectedAVD.name} is not running. Please start the emulator first.`
+                );
+                return;
+            }
+        } else {
+            // Fallback to existing device selection logic (for physical devices or legacy)
+            selectedDevice = this.avdService.getSelectedDevice();
+            if (!selectedDevice) {
+                const onlineDevices = this.avdService.getOnlineDevices();
+                if (onlineDevices.length > 0) {
+                    await this.avdService.selectDevice(onlineDevices[0].id);
+                    selectedDevice = onlineDevices[0];
+                }
             }
         }
 
-        // If still no device ID, try to select the first online device
-        if (!selectedDeviceId) {
-            const onlineDevices = this.avdService.getOnlineDevices();
-            if (onlineDevices.length > 0) {
-                console.log('no selected device id, trying to select first online device');
-                // Auto-select first online device
-                await this.avdService.selectDevice(onlineDevices[0].id);
-                selectedDeviceId = onlineDevices[0].id;
-            }
-        }
-
-        // Validate device is selected
-        if (!selectedDeviceId) {
-            console.log('no selected device id, showing warning');
-            vscode.window.showWarningMessage('No device selected. Please select a device first.');
-            return;
-        }
-
-        // Get the selected device
-        const selectedDevice = this.avdService.getSelectedDevice();
         if (!selectedDevice) {
-            console.log('selected device not found, showing warning');
-            vscode.window.showWarningMessage(`Selected device ${selectedDeviceId} is not online or not found. Please ensure the device is connected and try again.`);
+            vscode.window.showWarningMessage('No device selected. Please select a device first.');
             return;
         }
 

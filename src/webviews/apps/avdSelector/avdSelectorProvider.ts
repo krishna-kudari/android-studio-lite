@@ -53,10 +53,9 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     async includeBootstrap(): Promise<AVDSelectorWebviewState> {
         const avds = await this.avdService.getAVDList();
         const avdList = avds || [];
-        let selectedAVD = this.avdService.getSelectedAVDName() || undefined;
+        const selectedAVD = this.avdService.getSelectedAVDName() || undefined;
         if (!selectedAVD && avdList.length > 0) {
-            await this.avdService.setSelectedAVDName(avdList[0].name);
-            selectedAVD = avdList[0].name;
+            await this.avdService.setSelectedAVD(avdList[0].name);
         }
 
         // Get modules and filter for application type
@@ -111,7 +110,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         } else if (e.type === 'select-avd') {
             const { avdName } = e.params || {};
             if (avdName) {
-                void this.avdService.setSelectedAVDName(avdName);
+                await this.avdService.setSelectedAVD(avdName);
                 void this.host.notify('avd-selected', { avdName });
             }
         } else if (e.type === 'select-module') {
@@ -310,15 +309,13 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
             console.log(`[AVDSelectorProvider] AVD ${avdName} is already running, skipping launch`);
             // Ensure device ID is set even if AVD is already running
             await this.avdService.refreshDevices(true);
-            const selectedDeviceId = this.avdService.getSelectedDeviceId();
-            if (!selectedDeviceId) {
-                // Try to find device by AVD name and select it
+            const emulatorDevice = await this.avdService.getRunningEmulatorForAVD(avdName);
+            if (emulatorDevice) {
+                await this.avdService.selectDevice(emulatorDevice.id);
+            } else {
+                // Fallback: select first online device if no matching emulator found
                 const devices = this.avdService.getOnlineDevices();
-                const matchingDevice = devices.find(d => d.avdName === avdName);
-                if (matchingDevice) {
-                    await this.avdService.selectDevice(matchingDevice.id);
-                } else if (devices.length > 0) {
-                    // Fallback: select first online device
+                if (devices.length > 0) {
                     await this.avdService.selectDevice(devices[0].id);
                 }
             }
@@ -368,15 +365,13 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
 
                         // Refresh devices and ensure device ID is set for the AVD
                         await this.avdService.refreshDevices(true);
-                        const selectedDeviceId = this.avdService.getSelectedDeviceId();
-                        if (!selectedDeviceId) {
-                            // Try to find device by AVD name and select it
+                        const emulatorDevice = await this.avdService.getRunningEmulatorForAVD(avdName);
+                        if (emulatorDevice) {
+                            await this.avdService.selectDevice(emulatorDevice.id);
+                        } else {
+                            // Fallback: select first online device if no matching emulator found
                             const devices = this.avdService.getOnlineDevices();
-                            const matchingDevice = devices.find(d => d.avdName === avdName);
-                            if (matchingDevice) {
-                                await this.avdService.selectDevice(matchingDevice.id);
-                            } else if (devices.length > 0) {
-                                // Fallback: select first online device
+                            if (devices.length > 0) {
                                 await this.avdService.selectDevice(devices[0].id);
                             }
                         }

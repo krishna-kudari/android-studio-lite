@@ -24,6 +24,7 @@ export class LaunchAVDCommand extends Command {
     async execute(node?: any): Promise<void> {
         let name = node?.avd?.name ?? undefined;
         await this.launchAVDDiag(name);
+        this.avdService.setSelectedAVD(name);
         this.treeDataProvider.refresh();
     }
 
