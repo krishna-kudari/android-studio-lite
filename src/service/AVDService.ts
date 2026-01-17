@@ -111,7 +111,7 @@ export class AVDService extends Service {
         return this.emulator.exec<string>(EmuCommand.run, name, opt);
     }
 
-    startDevicePolling(intervalMs: number = 5 * 60 * 1000): void {
+    startDevicePolling(intervalMs: number = 30 * 1000): void {
         if (this.devicePollingInterval) {
             return;
         }
