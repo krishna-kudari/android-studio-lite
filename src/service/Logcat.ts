@@ -13,7 +13,6 @@ import { ADBExecutable, Command } from "../cmd/ADB";
 @injectable()
 export class LogcatService extends Service {
     private logcatProcess: ChildProcess | null = null;
-    private _isPaused: boolean = false;
     private outputChannel: vscode.OutputChannel;
     private readonly adbExecutable: ADBExecutable;
     private webviewMessageCallback: ((message: string) => void) | null = null;
@@ -27,8 +26,7 @@ export class LogcatService extends Service {
     ) {
         super(cache, configService, output);
         this.outputChannel = vscode.window.createOutputChannel('Logcat');
-        // Get ADB path from config, fallback to 'adb' if not configured
-        const adbPath = configService.getAdbPath() || 'adb';
+        const adbPath = configService.getAdbPath();
         this.adbExecutable = new ADBExecutable(output, adbPath);
     }
 
@@ -51,13 +49,14 @@ export class LogcatService extends Service {
      */
     async start(): Promise<void> {
         // Refresh devices to ensure we have the latest device list
+        console.log('selected device', this.avdService.getSelectedDevice());
         await this.avdService.refreshDevices(true);
-
         // Check if we have a selected device ID
         let selectedDeviceId = this.avdService.getSelectedDeviceId();
 
         // If no device ID but we have an AVD name, try to auto-select based on AVD name
         if (!selectedDeviceId) {
+            console.log('no selected device id, trying to select based on AVD name');
             const selectedAVDName = this.avdService.getSelectedAVDName();
             if (selectedAVDName) {
                 // Refresh again to trigger auto-selection logic
@@ -70,6 +69,7 @@ export class LogcatService extends Service {
         if (!selectedDeviceId) {
             const onlineDevices = this.avdService.getOnlineDevices();
             if (onlineDevices.length > 0) {
+                console.log('no selected device id, trying to select first online device');
                 // Auto-select first online device
                 await this.avdService.selectDevice(onlineDevices[0].id);
                 selectedDeviceId = onlineDevices[0].id;
@@ -78,6 +78,7 @@ export class LogcatService extends Service {
 
         // Validate device is selected
         if (!selectedDeviceId) {
+            console.log('no selected device id, showing warning');
             vscode.window.showWarningMessage('No device selected. Please select a device first.');
             return;
         }
@@ -85,6 +86,7 @@ export class LogcatService extends Service {
         // Get the selected device
         const selectedDevice = this.avdService.getSelectedDevice();
         if (!selectedDevice) {
+            console.log('selected device not found, showing warning');
             vscode.window.showWarningMessage(`Selected device ${selectedDeviceId} is not online or not found. Please ensure the device is connected and try again.`);
             return;
         }
@@ -92,6 +94,7 @@ export class LogcatService extends Service {
         // Validate module is selected
         const selectedModule = this.buildVariantService.getSelectedModule();
         if (!selectedModule) {
+            console.log('no selected module, showing warning');
             vscode.window.showWarningMessage('No module selected. Please select a module first.');
             return;
         }
@@ -99,32 +102,35 @@ export class LogcatService extends Service {
         // Get applicationId
         const applicationId = this.buildVariantService.getSelectedModuleApplicationId();
         if (!applicationId) {
+            console.log('no applicationId found for module, showing warning');
             vscode.window.showWarningMessage(`No applicationId found for module ${selectedModule}.`);
             return;
         }
 
+        console.log('applicationId found', applicationId);
+
         // Stop existing process if any
         this.stop();
+        console.log('logcat process stopped');
 
         // Clear output channel (fallback)
         this.outputChannel.clear();
+        console.log('output channel cleared');
         // Clear webview if callback is registered
         if (this.webviewMessageCallback) {
             this.webviewMessageCallback('clear');
         }
-        this._isPaused = false;
 
         try {
             const deviceId = selectedDevice.id;
 
             // Get command from ADBExecutable
             const commandProp = this.adbExecutable.getCommand(Command.logcat);
-            if (!commandProp || !commandProp.command) {
-                throw new Error('Logcat command not found in ADBExecutable');
-            }
 
             // Build command string using ADBExecutable
-            const command = this.adbExecutable.getCmd(commandProp, deviceId, applicationId, '*:V');
+            const command = this.adbExecutable.getCmd(commandProp, deviceId, applicationId, '-T 1 *:V');
+
+            console.log('command', command);
 
             // Spawn process directly (we need to keep it running, so we can't use exec which waits for completion)
             this.logcatProcess = spawn(command, {
@@ -135,14 +141,12 @@ export class LogcatService extends Service {
             // Handle stdout
             if (this.logcatProcess.stdout) {
                 this.logcatProcess.stdout.on('data', (data: Buffer) => {
-                    if (!this._isPaused) {
                         const text = data.toString();
                         // Send to webview if callback is registered, otherwise fallback to output channel
                         if (this.webviewMessageCallback) {
                             this.webviewMessageCallback(text);
                         } else {
-                            this.outputChannel.append(text);
-                        }
+                        this.outputChannel.append(text);
                     }
                 });
             }
@@ -153,13 +157,11 @@ export class LogcatService extends Service {
                     const text = data.toString();
                     // Filter out error messages, process as logs
                     if (!text.includes('error') && !text.includes('Error') && !text.includes('ERROR')) {
-                        if (!this._isPaused) {
                             // Send to webview if callback is registered, otherwise fallback to output channel
                             if (this.webviewMessageCallback) {
                                 this.webviewMessageCallback(text);
                             } else {
-                                this.outputChannel.append(text);
-                            }
+                            this.outputChannel.append(text);
                         }
                     } else {
                         console.error(`[Logcat] stderr: ${text}`);
@@ -199,25 +201,10 @@ export class LogcatService extends Service {
      * Stop logcat streaming
      */
     stop(): void {
-        if (this.logcatProcess) {
-            this.logcatProcess.kill();
-            this.logcatProcess = null;
-        }
-        this._isPaused = false;
-    }
-
-    /**
-     * Pause logcat streaming
-     */
-    pause(): void {
-        this._isPaused = true;
-    }
-
-    /**
-     * Resume logcat streaming
-     */
-    resume(): void {
-        this._isPaused = false;
+        if (!this.logcatProcess) return;
+        this.logcatProcess.kill();
+        this.logcatProcess = null;
+        this.output.show();
     }
 
     /**
@@ -229,20 +216,6 @@ export class LogcatService extends Service {
         if (this.webviewMessageCallback) {
             this.webviewMessageCallback('clear');
         }
-    }
-
-    /**
-     * Check if logcat is running
-     */
-    isRunning(): boolean {
-        return this.logcatProcess !== null;
-    }
-
-    /**
-     * Check if logcat is paused
-     */
-    isPaused(): boolean {
-        return this._isPaused;
     }
 
     /**

@@ -9,9 +9,7 @@ import { ExtensionConfig } from './onboarding/extensionConfig';
 import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboardingProvider';
 import { LogcatWebviewProvider } from './webviews/apps/logcat/logcatProvider';
 import { CommandRegistry } from './commands/CommandRegistry';
-import { registerCommands } from './commands/registerCommands';
 import { LogcatService } from './service/Logcat';
-import * as logcatCommands from './commands/logcat/logcatCommands';
 
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
@@ -103,18 +101,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	const commandRegistry = resolve<CommandRegistry>(TYPES.CommandRegistry);
 
 	// Register all commands using the new command registry
-	registerCommands(commandRegistry, context, {
+	CommandRegistry.registerCommands(commandRegistry, context, {
 		androidService, // Use DI-resolved AndroidService
 		onboardingWebview,
 		logcatService,
-		logcatCommands: {
-			startLogcatCommand: logcatCommands.startLogcatCommand,
-			stopLogcatCommand: logcatCommands.stopLogcatCommand,
-			pauseLogcatCommand: logcatCommands.pauseLogcatCommand,
-			resumeLogcatCommand: logcatCommands.resumeLogcatCommand,
-			clearLogcatCommand: logcatCommands.clearLogcatCommand,
-			setLogLevelCommand: logcatCommands.setLogLevelCommand,
-		},
 	});
 
 	// Add command registry disposal to context subscriptions

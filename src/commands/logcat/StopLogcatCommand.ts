@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import { Command } from '../base/Command';
 import { LogcatService } from '../../service/Logcat';
 
@@ -13,17 +12,12 @@ export class StopLogcatCommand extends Command {
     readonly description = 'Stop Android logcat output';
 
     constructor(
-        private readonly logcatService: LogcatService | null,
-        private readonly stopLogcatFn: (service: LogcatService) => void
+        private readonly logcatService: LogcatService
     ) {
         super();
     }
 
     execute(): void {
-        if (this.logcatService) {
-            this.stopLogcatFn(this.logcatService);
-        } else {
-            vscode.window.showErrorMessage('Logcat service not initialized');
-        }
+        this.logcatService.stop();
     }
 }

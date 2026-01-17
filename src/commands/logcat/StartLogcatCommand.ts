@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import { Command } from '../base/Command';
 import { LogcatService } from '../../service/Logcat';
 
@@ -13,19 +12,12 @@ export class StartLogcatCommand extends Command {
     readonly description = 'Start Android logcat output';
 
     constructor(
-        private readonly logcatService: LogcatService | null,
-        private readonly startLogcatFn: (service: LogcatService) => Promise<void>
+        private readonly logcatService: LogcatService
     ) {
         super();
     }
 
     async execute(): Promise<void> {
-        if (!this.logcatService) {
-            vscode.window.showErrorMessage('Logcat service not initialized');
-            return;
-        }
-
-        // Start logcat (validation happens inside LogcatService.start())
-        await this.startLogcatFn(this.logcatService);
+        this.logcatService.start();
     }
 }

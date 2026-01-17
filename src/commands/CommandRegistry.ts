@@ -6,6 +6,10 @@
  */
 import * as vscode from 'vscode';
 import { Command } from './base/Command';
+import { AndroidService } from '../service/AndroidService';
+import { LogcatService, StartLogcatCommand, StopLogcatCommand, ClearLogcatCommand, SetLogLevelCommand } from './logcat';
+import { ShowOnboardingCommand } from './onboarding';
+import { SetupWizardCommand, SetupSdkPathCommand, SetupAvdManagerCommand, SetupSdkManagerCommand, SetupEmulatorCommand } from './setup';
 
 /**
  * Command registry for managing all extension commands.
@@ -101,5 +105,38 @@ export class CommandRegistry {
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
         this.commands.clear();
+    }
+
+    /**
+     * Register all commands with the command registry.
+     *
+     * @param registry Command registry instance
+     * @param context VS Code extension context
+     * @param dependencies Command dependencies
+     */
+    static registerCommands(
+        registry: CommandRegistry,
+        context: vscode.ExtensionContext,
+        dependencies: {
+            androidService: AndroidService;
+            onboardingWebview: { show(): Promise<void> };
+            logcatService: LogcatService;
+        }
+    ): void {
+        // Setup commands
+        registry.register(new SetupWizardCommand(dependencies.androidService), context);
+        registry.register(new SetupSdkPathCommand(dependencies.androidService), context);
+        registry.register(new SetupAvdManagerCommand(dependencies.androidService), context);
+        registry.register(new SetupSdkManagerCommand(dependencies.androidService), context);
+        registry.register(new SetupEmulatorCommand(dependencies.androidService), context);
+
+        // Onboarding command
+        registry.register(new ShowOnboardingCommand(dependencies.onboardingWebview), context);
+
+        // Logcat commands
+        registry.register(new StartLogcatCommand(dependencies.logcatService), context);
+        registry.register(new StopLogcatCommand(dependencies.logcatService), context);
+        registry.register(new ClearLogcatCommand(dependencies.logcatService), context);
+        registry.register(new SetLogLevelCommand(dependencies.logcatService), context);
     }
 }
