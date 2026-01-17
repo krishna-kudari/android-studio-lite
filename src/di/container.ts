@@ -40,10 +40,9 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
 
     // Register core utilities as singletons
     container.registerSingleton<ConfigService>(TYPES.ConfigService, ConfigService);
-    // Output needs a factory since it takes a name parameter
-    container.register<Output>(TYPES.Output, {
-        useFactory: () => new Output('Android Studio Lite')
-    });
+    // Output needs to be a singleton to avoid creating multiple output channels
+    const output = new Output('Android Studio Lite');
+    container.registerInstance<Output>(TYPES.Output, output);
     container.registerSingleton<Cache>(TYPES.Cache, Cache);
 
     // Register Android services
