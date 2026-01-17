@@ -1,6 +1,7 @@
 import 'reflect-metadata'; // Required for tsyringe decorators
 import * as vscode from 'vscode';
-import { AVDTreeView } from './ui/AVDTreeView';
+import { DependencyContainer } from 'tsyringe';
+import { AVDTreeView } from './avd/AVDTreeView';
 import { BuildVariantTreeView } from './ui/BuildVariantTreeView';
 import { WebviewsController } from './webviews/webviewsController';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
@@ -10,15 +11,96 @@ import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboarding
 import { LogcatWebviewProvider } from './webviews/apps/logcat/logcatProvider';
 import { CommandRegistry } from './commands/CommandRegistry';
 import { LogcatService } from './service/Logcat';
+import { AndroidService } from './service/AndroidService';
+import { AVDService } from './service/AVDService';
+import { ConfigService } from './config';
+import { BuildVariantService } from './service/BuildVariantService';
+import { GradleService } from './service/GradleService';
+import { Output } from './module/output';
+
+interface ResolvedServices {
+	configService: ConfigService;
+	androidService: AndroidService;
+	avdService: AVDService;
+	buildVariantService: BuildVariantService;
+	gradleService: GradleService;
+	output: Output;
+	logcatService: LogcatService;
+}
 
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
 
-	// Register AVD Selector webview view using new architecture
+	// Initialize dependency injection and resolve services
+	const container = initializeDependencyInjection(context);
+	const services = resolveServices(container);
+
+	// Initialize extension configuration and handle onboarding
+	await initializeExtensionConfig(context);
+
+	// Initialize and verify Android service
+	await initializeAndroidService(services.androidService);
+
+	// Setup webviews (panels and views)
+	const webviewsController = initializeWebviews(context, services);
+
+	// Setup tree views
+	const avdTreeView = initializeTreeViews(context, services);
+
+	// Setup commands
+	initializeCommands(context, services, webviewsController.onboardingWebview, avdTreeView);
+}
+
+function initializeDependencyInjection(context: vscode.ExtensionContext): DependencyContainer {
+	const container = setupContainer(context);
+	console.log('Dependency Injection container initialized');
+	return container;
+}
+
+function resolveServices(container: DependencyContainer): ResolvedServices {
+	return {
+		configService: container.resolve<ConfigService>(TYPES.ConfigService),
+		androidService: container.resolve<AndroidService>(TYPES.AndroidService),
+		avdService: container.resolve<AVDService>(TYPES.AVDService),
+		buildVariantService: container.resolve<BuildVariantService>(TYPES.BuildVariantService),
+		gradleService: container.resolve<GradleService>(TYPES.GradleService),
+		output: container.resolve<Output>(TYPES.Output),
+		logcatService: resolve<LogcatService>(TYPES.LogcatService),
+	};
+}
+
+async function initializeExtensionConfig(context: vscode.ExtensionContext): Promise<void> {
+	const extensionConfig = new ExtensionConfig(context);
+
+	if (extensionConfig.isInstall()) {
+		setTimeout(() => {
+			vscode.commands.executeCommand('android-studio-lite.showOnboarding');
+		}, 100);
+	}
+
+	try {
+		await extensionConfig.updateExtensionMetadata();
+	} catch (error) {
+		console.error('Failed to update extension metadata:', error);
+	}
+}
+
+async function initializeAndroidService(androidService: AndroidService): Promise<void> {
+	await androidService.initCheck();
+}
+
+function initializeWebviews(
+	context: vscode.ExtensionContext,
+	services: ResolvedServices,
+): {
+	controller: WebviewsController;
+	onboardingWebview: any;
+	avdSelectorWebview: any;
+	logcatPanel: any;
+} {
 	const webviewsController = new WebviewsController(context);
 	context.subscriptions.push(webviewsController);
 
-	// seperate webviews registy like commands registry
 	const onboardingWebview = webviewsController.registerWebviewPanel(
 		{
 			id: 'android-studio-lite.onboarding',
@@ -30,86 +112,67 @@ export async function activate(context: vscode.ExtensionContext) {
 		async (host) => new OnboardingWebviewProvider(host),
 	);
 
-	// Initialize Dependency Injection Container
-	// This registers all services and their dependencies
-	const container = setupContainer(context);
-	console.log('Dependency Injection container initialized');
-
-	// Get services from DI container (preferred approach)
-	const configService = container.resolve<import('./config').ConfigService>(TYPES.ConfigService);
-	const androidService = container.resolve<import('./service/AndroidService').AndroidService>(TYPES.AndroidService);
-	const avdService = container.resolve<import('./service/AVDService').AVDService>(TYPES.AVDService);
-	const buildVariantService = container.resolve<import('./service/BuildVariantService').BuildVariantService>(TYPES.BuildVariantService);
-	const gradleService = container.resolve<import('./service/GradleService').GradleService>(TYPES.GradleService);
-	const output = container.resolve<import('./module/output').Output>(TYPES.Output);
-
-	const extensionConfig = new ExtensionConfig(context);
-	if (extensionConfig.isInstall()) {
-		// Will be executed after onboarding command is registered
-		setTimeout(() => {
-			vscode.commands.executeCommand('android-studio-lite.showOnboarding');
-		}, 100);
-	}
-
-	// Update metadata asynchronously, handle errors gracefully
-	try {
-		await extensionConfig.updateExtensionMetadata();
-	} catch (error) {
-		// Log error but don't fail activation
-		console.error('Failed to update extension metadata:', error);
-	}
-
-	// Initialize Android service check (using DI-resolved service)
-	await androidService.initCheck();
-
-
-	context.subscriptions.push(
-		webviewsController.registerWebviewView(
-			{
-				id: 'android-studio-lite-avd-dropdown',
-				fileName: 'avdSelector.html',
-				title: 'Android Studio Lite',
-			},
-			async (host) => new AVDSelectorProvider(host, context, avdService, buildVariantService, gradleService, output, configService),
-		)
+	const avdSelectorWebview = webviewsController.registerWebviewView(
+		{
+			id: 'android-studio-lite-avd-dropdown',
+			fileName: 'avdSelector.html',
+			title: 'Android Studio Lite',
+		},
+		async (host) =>
+			new AVDSelectorProvider(
+				host,
+				context,
+				services.avdService,
+				services.buildVariantService,
+				services.gradleService,
+				services.output,
+				services.configService,
+			),
 	);
+	context.subscriptions.push(avdSelectorWebview);
 
-	// Register Logcat panel webview view
-	context.subscriptions.push(
-		webviewsController.registerWebviewView(
-			{
-				id: 'android-studio-lite-logcat',
-				fileName: 'logcat.html',
-				title: 'Logcat',
-			},
-			async (host) => new LogcatWebviewProvider(host),
-		)
+	const logcatPanel = webviewsController.registerWebviewView(
+		{
+			id: 'android-studio-lite-logcat',
+			fileName: 'logcat.html',
+			title: 'Logcat',
+		},
+		async (host) => new LogcatWebviewProvider(host),
 	);
+	context.subscriptions.push(logcatPanel);
 
-	//avd manager
-	const avdTreeView = new AVDTreeView(context, avdService);
-	console.log("avd loaded");
+	return { controller: webviewsController, onboardingWebview, avdSelectorWebview, logcatPanel };
+}
 
-	//build variant manager
-	new BuildVariantTreeView(context, buildVariantService);
-	console.log("build variant loaded");
+function initializeTreeViews(
+	context: vscode.ExtensionContext,
+	services: ResolvedServices,
+): AVDTreeView {
+	const avdTreeView = new AVDTreeView(context, services.avdService);
+	console.log('AVD tree view loaded');
 
-	// Initialize logcat service using DI
-	const logcatService = resolve<LogcatService>(TYPES.LogcatService);
+	new BuildVariantTreeView(context, services.buildVariantService);
+	console.log('Build variant tree view loaded');
 
-	// Get Command Registry from DI container
+	return avdTreeView;
+}
+
+function initializeCommands(
+	context: vscode.ExtensionContext,
+	services: ResolvedServices,
+	onboardingWebview: any,
+	avdTreeView: AVDTreeView,
+): void {
 	const commandRegistry = resolve<CommandRegistry>(TYPES.CommandRegistry);
-
-	// Register all commands using the new command registry
 	CommandRegistry.registerCommands(commandRegistry, context, {
-		androidService, // Use DI-resolved AndroidService
+		androidService: services.androidService,
 		onboardingWebview,
-		logcatService,
+		logcatService: services.logcatService,
+		avdService: services.avdService,
+		treeDataProvider: avdTreeView.provider,
 	});
 
-	// Add command registry disposal to context subscriptions
 	context.subscriptions.push(commandRegistry);
-
 }
 
 // this method is called when your extension is deactivated

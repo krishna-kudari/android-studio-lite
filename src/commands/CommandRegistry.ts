@@ -10,6 +10,9 @@ import { AndroidService } from '../service/AndroidService';
 import { LogcatService, StartLogcatCommand, StopLogcatCommand, ClearLogcatCommand, SetLogLevelCommand } from './logcat';
 import { ShowOnboardingCommand } from './onboarding';
 import { SetupWizardCommand, SetupSdkPathCommand, SetupAvdManagerCommand, SetupSdkManagerCommand, SetupEmulatorCommand } from './setup';
+import { CreateAVDCommand, RefreshAVDListCommand, LaunchAVDCommand, RenameAVDCommand, DeleteAVDCommand, ShowAVDDirectoryCommand, ShowAVDConfigFileCommand } from '../avd/commands';
+import { AVDService } from '../service/AVDService';
+import { AVDTreeDataProvider } from '../avd/AVDTreeDataProvider';
 
 /**
  * Command registry for managing all extension commands.
@@ -121,22 +124,79 @@ export class CommandRegistry {
             androidService: AndroidService;
             onboardingWebview: { show(): Promise<void> };
             logcatService: LogcatService;
+            avdService: AVDService;
+            treeDataProvider: AVDTreeDataProvider;
         }
     ): void {
-        // Setup commands
+        CommandRegistry.registerSetupCommands(registry, context, {
+            androidService: dependencies.androidService,
+        });
+
+        CommandRegistry.registerOnboardingCommands(registry, context, {
+            onboardingWebview: dependencies.onboardingWebview,
+        });
+
+        CommandRegistry.registerLogcatCommands(registry, context, {
+            logcatService: dependencies.logcatService,
+        });
+
+        CommandRegistry.registerAVDCommands(registry, context, {
+            avdService: dependencies.avdService,
+            treeDataProvider: dependencies.treeDataProvider,
+        });
+    }
+
+    static registerLogcatCommands(
+        registry: CommandRegistry,
+        context: vscode.ExtensionContext,
+        dependencies: {
+            logcatService: LogcatService;
+        }
+    ): void {
+        registry.register(new StartLogcatCommand(dependencies.logcatService), context);
+        registry.register(new StopLogcatCommand(dependencies.logcatService), context);
+        registry.register(new ClearLogcatCommand(dependencies.logcatService), context);
+        registry.register(new SetLogLevelCommand(dependencies.logcatService), context);
+    }
+
+    static registerOnboardingCommands(
+        registry: CommandRegistry,
+        context: vscode.ExtensionContext,
+        dependencies: {
+            onboardingWebview: { show(): Promise<void> };
+        }
+    ): void {
+        registry.register(new ShowOnboardingCommand(dependencies.onboardingWebview), context);
+    }
+
+    static registerSetupCommands(
+        registry: CommandRegistry,
+        context: vscode.ExtensionContext,
+        dependencies: {
+            androidService: AndroidService;
+        }
+    ): void {
         registry.register(new SetupWizardCommand(dependencies.androidService), context);
         registry.register(new SetupSdkPathCommand(dependencies.androidService), context);
         registry.register(new SetupAvdManagerCommand(dependencies.androidService), context);
         registry.register(new SetupSdkManagerCommand(dependencies.androidService), context);
         registry.register(new SetupEmulatorCommand(dependencies.androidService), context);
+    }
 
-        // Onboarding command
-        registry.register(new ShowOnboardingCommand(dependencies.onboardingWebview), context);
-
-        // Logcat commands
-        registry.register(new StartLogcatCommand(dependencies.logcatService), context);
-        registry.register(new StopLogcatCommand(dependencies.logcatService), context);
-        registry.register(new ClearLogcatCommand(dependencies.logcatService), context);
-        registry.register(new SetLogLevelCommand(dependencies.logcatService), context);
+    static registerAVDCommands(
+        registry: CommandRegistry,
+        context: vscode.ExtensionContext,
+        dependencies: {
+            avdService: AVDService;
+            treeDataProvider: AVDTreeDataProvider;
+        }
+    ): void {
+        registry.register(new CreateAVDCommand(dependencies.avdService, dependencies.treeDataProvider), context);
+        registry.register(new RefreshAVDListCommand(dependencies.avdService, dependencies.treeDataProvider), context);
+        registry.register(new LaunchAVDCommand(dependencies.avdService, dependencies.treeDataProvider), context);
+        registry.register(new RenameAVDCommand(dependencies.avdService, dependencies.treeDataProvider), context);
+        registry.register(new DeleteAVDCommand(dependencies.avdService, dependencies.treeDataProvider), context);
+        registry.register(new ShowAVDDirectoryCommand(), context);
+        registry.register(new ShowAVDConfigFileCommand(), context);
     }
 }
