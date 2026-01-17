@@ -46,15 +46,15 @@
           "when": "true"
         },
         {
-          "id": "android-studio-lite-avd",
-          "name": "Android Virtual Device",
-          "contextualTitle": "AVD Manager - Android Virtual Device",
-          "when": "true"
-        },
-        {
           "id": "android-studio-lite-build-variant",
           "name": "Build Variant",
           "contextualTitle": "Build Variant",
+          "when": "true"
+        },
+        {
+          "id": "android-studio-lite-avd",
+          "name": "Android Virtual Device",
+          "contextualTitle": "AVD Manager - Android Virtual Device",
           "when": "true"
         }
       ],
