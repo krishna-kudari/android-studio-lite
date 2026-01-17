@@ -50,7 +50,7 @@ export class BuildVariantService extends Service {
     readonly workspacePath: string;
     private selectedModule: string | null = null;
     private readonly STORAGE_KEY_MODULE = 'selectedModule';
-    private readonly STORAGE_KEY_VARIANT = 'android-studio-lite.selectedBuildVariants';
+    public readonly STORAGE_KEY_MODULE_VARIANT = 'android-studio-lite.selectedBuildVariants';
     private readonly moduleSelectionListeners = new Set<(moduleName: string | null) => void>();
 
     constructor(
@@ -91,7 +91,7 @@ export class BuildVariantService extends Service {
 
         try {
             const selectedVariants = this.context.workspaceState.get<Record<string, string>>(
-                this.STORAGE_KEY_VARIANT,
+                this.STORAGE_KEY_MODULE_VARIANT,
                 {}
             );
             const variantName = selectedVariants[this.selectedModule];

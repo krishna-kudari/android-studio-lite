@@ -75,11 +75,6 @@
         "when": "true"
       },
       {
-        "command": "android-studio-lite.selectBuildVariant",
-        "title": "Select Build Variant",
-        "icon": "$(tools)"
-      },
-      {
         "command": "android-studio-lite.runApp",
         "title": "Run App",
         "icon": "$(play)"
@@ -258,10 +253,7 @@
         }
       ],
       "commandPalette": [
-        {
-          "command": "android-studio-lite.selectBuildVariant",
-          "when": "true"
-        },
+
         {
           "command": "android-studio-lite.runApp",
           "when": "true"

@@ -13,6 +13,9 @@ import { SetupWizardCommand, SetupSdkPathCommand, SetupAvdManagerCommand, SetupS
 import { CreateAVDCommand, RefreshAVDListCommand, LaunchAVDCommand, RenameAVDCommand, DeleteAVDCommand, ShowAVDDirectoryCommand, ShowAVDConfigFileCommand } from '../avd/commands';
 import { AVDService } from '../service/AVDService';
 import { AVDTreeDataProvider } from '../avd/AVDTreeDataProvider';
+import { RefreshBuildVariantListCommand, SelectBuildVariantCommand } from '../buildVariant/commands';
+import { BuildVariantService } from '../service/BuildVariantService';
+import { BuildVariantTreeDataProvider } from '../buildVariant/BuildVariantTreeDataProvider';
 
 /**
  * Command registry for managing all extension commands.
@@ -126,6 +129,8 @@ export class CommandRegistry {
             logcatService: LogcatService;
             avdService: AVDService;
             treeDataProvider: AVDTreeDataProvider;
+            buildVariantService: BuildVariantService;
+            buildVariantTreeDataProvider: BuildVariantTreeDataProvider;
         }
     ): void {
         CommandRegistry.registerSetupCommands(registry, context, {
@@ -143,6 +148,11 @@ export class CommandRegistry {
         CommandRegistry.registerAVDCommands(registry, context, {
             avdService: dependencies.avdService,
             treeDataProvider: dependencies.treeDataProvider,
+        });
+
+        CommandRegistry.registerBuildVariantCommands(registry, context, {
+            buildVariantService: dependencies.buildVariantService,
+            treeDataProvider: dependencies.buildVariantTreeDataProvider,
         });
     }
 
@@ -198,5 +208,17 @@ export class CommandRegistry {
         registry.register(new DeleteAVDCommand(dependencies.avdService, dependencies.treeDataProvider), context);
         registry.register(new ShowAVDDirectoryCommand(), context);
         registry.register(new ShowAVDConfigFileCommand(), context);
+    }
+
+    static registerBuildVariantCommands(
+        registry: CommandRegistry,
+        context: vscode.ExtensionContext,
+        dependencies: {
+            buildVariantService: BuildVariantService;
+            treeDataProvider: BuildVariantTreeDataProvider;
+        }
+    ): void {
+        registry.register(new RefreshBuildVariantListCommand(dependencies.buildVariantService, dependencies.treeDataProvider), context);
+        registry.register(new SelectBuildVariantCommand(dependencies.buildVariantService, dependencies.treeDataProvider), context);
     }
 }

@@ -2,7 +2,7 @@ import 'reflect-metadata'; // Required for tsyringe decorators
 import * as vscode from 'vscode';
 import { DependencyContainer } from 'tsyringe';
 import { AVDTreeView } from './avd/AVDTreeView';
-import { BuildVariantTreeView } from './ui/BuildVariantTreeView';
+import { BuildVariantTreeView } from './buildVariant/BuildVariantTreeView';
 import { WebviewsController } from './webviews/webviewsController';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
 import { setupContainer, resolve, TYPES } from './di';
@@ -45,10 +45,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	const webviewsController = initializeWebviews(context, services);
 
 	// Setup tree views
-	const avdTreeView = initializeTreeViews(context, services);
+	const { avdTreeView, buildVariantTreeView } = initializeTreeViews(context, services);
 
 	// Setup commands
-	initializeCommands(context, services, webviewsController.onboardingWebview, avdTreeView);
+	initializeCommands(context, services, webviewsController.onboardingWebview, avdTreeView, buildVariantTreeView);
 }
 
 function initializeDependencyInjection(context: vscode.ExtensionContext): DependencyContainer {
@@ -147,29 +147,32 @@ function initializeWebviews(
 function initializeTreeViews(
 	context: vscode.ExtensionContext,
 	services: ResolvedServices,
-): AVDTreeView {
+): { avdTreeView: AVDTreeView; buildVariantTreeView: BuildVariantTreeView } {
 	const avdTreeView = new AVDTreeView(context, services.avdService);
 	console.log('AVD tree view loaded');
 
-	new BuildVariantTreeView(context, services.buildVariantService);
+	const buildVariantTreeView = new BuildVariantTreeView(context, services.buildVariantService);
 	console.log('Build variant tree view loaded');
 
-	return avdTreeView;
+	return { avdTreeView, buildVariantTreeView };
 }
 
 function initializeCommands(
 	context: vscode.ExtensionContext,
 	services: ResolvedServices,
-	onboardingWebview: any,
+	onboardingWebview: { show(): Promise<void> },
 	avdTreeView: AVDTreeView,
+	buildVariantTreeView: BuildVariantTreeView,
 ): void {
 	const commandRegistry = resolve<CommandRegistry>(TYPES.CommandRegistry);
 	CommandRegistry.registerCommands(commandRegistry, context, {
 		androidService: services.androidService,
-		onboardingWebview,
+		onboardingWebview: onboardingWebview,
 		logcatService: services.logcatService,
 		avdService: services.avdService,
 		treeDataProvider: avdTreeView.provider,
+		buildVariantService: services.buildVariantService,
+		buildVariantTreeDataProvider: buildVariantTreeView.provider,
 	});
 
 	context.subscriptions.push(commandRegistry);

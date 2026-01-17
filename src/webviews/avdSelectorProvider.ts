@@ -165,7 +165,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
 
             // Get selected variant (use first one as default)
             const selectedVariants = this.context.workspaceState.get<Record<string, string>>(
-                'android-studio-lite.selectedBuildVariants',
+                this.buildVariantService.STORAGE_KEY_MODULE_VARIANT,
                 {}
             );
             const variantName = selectedVariants[moduleName] || module.variants[0].name;
