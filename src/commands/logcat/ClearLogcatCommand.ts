@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import { Command } from '../base/Command';
 import { LogcatService } from '../../service/Logcat';
 
@@ -13,17 +12,12 @@ export class ClearLogcatCommand extends Command {
     readonly description = 'Clear Android logcat output';
 
     constructor(
-        private readonly logcatService: LogcatService | null,
-        private readonly clearLogcatFn: (service: LogcatService) => void
+        private readonly logcatService: LogcatService,
     ) {
         super();
     }
 
     execute(): void {
-        if (this.logcatService) {
-            this.clearLogcatFn(this.logcatService);
-        } else {
-            vscode.window.showErrorMessage('Logcat service not initialized');
-        }
+        this.logcatService.clear();
     }
 }

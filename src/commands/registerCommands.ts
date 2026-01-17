@@ -49,7 +49,7 @@ export function registerCommands(
     dependencies: {
         androidService: AndroidService;
         onboardingWebview: { show(): Promise<void> };
-        logcatService: LogcatService | null;
+        logcatService: LogcatService;
         logcatCommands: ILogcatCommandFunctions;
     }
 ): void {
@@ -95,7 +95,6 @@ export function registerCommands(
     registry.register(
         new ClearLogcatCommand(
             dependencies.logcatService,
-            dependencies.logcatCommands.clearLogcatCommand
         ),
         context
     );

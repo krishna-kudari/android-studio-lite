@@ -97,13 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	console.log("build variant loaded");
 
 	// Initialize logcat service using DI
-	let logcatService: LogcatService | null = null;
-	try {
-		logcatService = resolve<LogcatService>(TYPES.LogcatService);
-		console.log("logcat service initialized");
-	} catch (error) {
-		console.error("Failed to initialize logcat service:", error);
-	}
+	const logcatService = resolve<LogcatService>(TYPES.LogcatService);
 
 	// Get Command Registry from DI container
 	const commandRegistry = resolve<CommandRegistry>(TYPES.CommandRegistry);
