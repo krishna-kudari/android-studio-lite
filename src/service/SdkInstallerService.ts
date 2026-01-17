@@ -1,3 +1,4 @@
+import { injectable, inject } from 'tsyringe';
 import * as vscode from 'vscode';
 import * as https from 'https';
 import * as http from 'http';
@@ -6,9 +7,10 @@ import * as path from 'path';
 import * as os from 'os';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { Manager } from '../core';
 import { AndroidSdkDetector, AndroidSdkInfo } from '../utils/androidSdkDetector';
 import { showMsg, MsgType } from '../module/ui';
+import { TYPES } from '../di/types';
+import { Output } from '../module/output';
 
 const execAsync = promisify(exec);
 
@@ -18,8 +20,11 @@ interface DownloadProgress {
     percentage: number;
 }
 
+@injectable()
 export class SdkInstallerService {
-    constructor(private manager: Manager) {}
+    constructor(
+        @inject(TYPES.Output) private readonly output: Output
+    ) {}
 
     /**
      * Checks network connectivity
@@ -197,7 +202,7 @@ export class SdkInstallerService {
             if (progress) {
                 progress.report({ message: 'Downloading Command-Line Tools...' });
             }
-            this.manager.output.append(`Downloading Command-Line Tools from ${url}...`);
+            this.output.append(`Downloading Command-Line Tools from ${url}...`);
 
             await this.downloadFile(url, zipPath, (downloadProgress) => {
                 if (progress) {
@@ -212,7 +217,7 @@ export class SdkInstallerService {
             if (progress) {
                 progress.report({ message: 'Extracting Command-Line Tools...' });
             }
-            this.manager.output.append('Extracting Command-Line Tools...');
+            this.output.append('Extracting Command-Line Tools...');
 
             // Extract to temp location first
             const tempExtractDir = path.join(tempDir, `cmdline-tools-extract-${Date.now()}`);
@@ -302,7 +307,7 @@ export class SdkInstallerService {
                 }
             }
 
-            this.manager.output.append('Command-Line Tools installed successfully!');
+            this.output.append('Command-Line Tools installed successfully!');
             return latestDir;
         } catch (error: any) {
             // Cleanup on error
@@ -324,7 +329,7 @@ export class SdkInstallerService {
                 maxBuffer: 10 * 1024 * 1024,
                 timeout: 60000, // 60 seconds timeout
             });
-            this.manager.output.append('Android SDK licenses accepted');
+            this.output.append('Android SDK licenses accepted');
         } catch (error) {
             // License acceptance might fail, but that's okay - user can accept manually later
             console.warn('Failed to auto-accept licenses:', error);
@@ -342,7 +347,7 @@ export class SdkInstallerService {
         if (progress) {
             progress.report({ message: `Installing ${component}...` });
         }
-        this.manager.output.append(`Installing ${component}...`);
+        this.output.append(`Installing ${component}...`);
 
         try {
             const { stdout, stderr } = await execAsync(`"${sdkManagerPath}" "${component}"`, {
@@ -351,13 +356,13 @@ export class SdkInstallerService {
             });
 
             if (stdout) {
-                this.manager.output.append(stdout);
+                this.output.append(stdout);
             }
             if (stderr && !stderr.includes('Warning:')) {
-                this.manager.output.append(stderr, 'error');
+                this.output.append(stderr, 'error');
             }
 
-            this.manager.output.append(`${component} installed successfully`);
+            this.output.append(`${component} installed successfully`);
         } catch (error: any) {
             const errorMsg = error.stderr || error.message || String(error);
             throw new Error(`Failed to install ${component}: ${errorMsg}`);

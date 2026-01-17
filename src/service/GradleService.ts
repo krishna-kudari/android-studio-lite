@@ -1,21 +1,28 @@
+import { injectable, inject } from 'tsyringe';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as child_process from 'child_process';
 import { Service } from "./Service";
-import { Manager } from "../core";
 import { GradleExecutable, Command } from "../cmd/Gradle";
 import { showMsg, MsgType } from '../module/ui';
+import { TYPES } from '../di/types';
+import { Cache } from '../module/cache';
+import { ConfigService } from '../config';
+import { Output } from '../module/output';
 
+@injectable()
 export class GradleService extends Service {
-    readonly manager: Manager;
     readonly gradle: GradleExecutable;
     readonly workspacePath: string;
     private buildProcess: child_process.ChildProcess | null = null;
 
-    constructor(manager: Manager) {
-        super(manager);
-        this.manager = manager;
-        this.gradle = new GradleExecutable(manager);
+    constructor(
+        @inject(TYPES.Cache) cache: Cache,
+        @inject(TYPES.ConfigService) configService: ConfigService,
+        @inject(TYPES.Output) output: Output
+    ) {
+        super(cache, configService, output);
+        this.gradle = new GradleExecutable(output);
         this.workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     }
 
@@ -63,7 +70,7 @@ export class GradleService extends Service {
                     if (onOutput) {
                         onOutput(output);
                     }
-                    this.manager.output.append(output);
+                    this.output.append(output);
                 });
             }
 
@@ -74,7 +81,7 @@ export class GradleService extends Service {
                     if (onOutput) {
                         onOutput(output);
                     }
-                    this.manager.output.append(output, "error");
+                    this.output.append(output, "error");
                 });
             }
 
@@ -94,7 +101,7 @@ export class GradleService extends Service {
 
             this.buildProcess.on('error', (error) => {
                 this.buildProcess = null;
-                this.manager.output.append(stderr, "error");
+                this.output.append(stderr, "error");
                 showMsg(MsgType.error, `Failed to install ${variantTask}: ${error.message}`);
                 reject(error);
             });
@@ -105,7 +112,7 @@ export class GradleService extends Service {
                     showMsg(MsgType.info, `${variantTask} installed successfully.`);
                     resolve();
                 } else {
-                    this.manager.output.append(stderr, "error");
+                    this.output.append(stderr, "error");
                     const errorMsg = stderr || stdout || `Gradle build failed with exit code ${code}`;
                     console.error(`[GradleService] Build failed. Exit code: ${code}, stderr: ${stderr}, stdout: ${stdout}`);
                     showMsg(MsgType.error, `Failed to install ${variantTask}. Exit code: ${code}`);
@@ -159,7 +166,7 @@ export class GradleService extends Service {
                     if (onOutput) {
                         onOutput(output);
                     }
-                    this.manager.output.append(output);
+                    this.output.append(output);
                 });
             }
 
@@ -170,7 +177,7 @@ export class GradleService extends Service {
                     if (onOutput) {
                         onOutput(output);
                     }
-                    this.manager.output.append(output, "error");
+                    this.output.append(output, "error");
                 });
             }
 
@@ -190,7 +197,7 @@ export class GradleService extends Service {
 
             this.buildProcess.on('error', (error) => {
                 this.buildProcess = null;
-                this.manager.output.append(stderr, "error");
+                this.output.append(stderr, "error");
                 showMsg(MsgType.error, `Failed to assemble ${variantTask}: ${error.message}`);
                 reject(error);
             });
@@ -201,7 +208,7 @@ export class GradleService extends Service {
                     showMsg(MsgType.info, `${variantTask} assembled successfully.`);
                     resolve();
                 } else {
-                    this.manager.output.append(stderr, "error");
+                    this.output.append(stderr, "error");
                     showMsg(MsgType.error, `Failed to assemble ${variantTask}. Exit code: ${code}`);
                     reject(new Error(`Gradle build failed with exit code ${code}`));
                 }

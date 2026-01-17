@@ -36,15 +36,15 @@ In `extension.ts`:
 ```typescript
 import 'reflect-metadata'; // Required at the top
 import { setupContainer, resolve, TYPES } from './di';
-import { Manager } from './core';
+import { AndroidService } from './service/AndroidService';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Setup DI container
     const container = setupContainer(context);
 
     // Resolve dependencies
-    const manager = resolve<Manager>(TYPES.Manager);
     const androidService = resolve<AndroidService>(TYPES.AndroidService);
+    await androidService.initCheck();
 }
 ```
 
@@ -67,12 +67,10 @@ await androidService.initCheck();
 
 ```typescript
 import { resolve, TYPES } from './di';
-import { Manager } from './core';
 import { AndroidService } from './service/AndroidService';
 import { ConfigService } from './config';
 
 // Resolve singleton services
-const manager = resolve<Manager>(TYPES.Manager);
 const config = resolve<ConfigService>(TYPES.ConfigService);
 const androidService = resolve<AndroidService>(TYPES.AndroidService);
 ```
@@ -82,7 +80,6 @@ const androidService = resolve<AndroidService>(TYPES.AndroidService);
 All available types are defined in `TYPES`:
 
 ```typescript
-TYPES.Manager              // Manager singleton
 TYPES.ConfigService        // Configuration service
 TYPES.Output              // Output channel
 TYPES.Cache               // Cache utility
@@ -109,8 +106,11 @@ container.registerSingleton<ConfigService>(TYPES.ConfigService, ConfigService);
 // Factory registration (for services with dependencies)
 container.register<AndroidService>(TYPES.AndroidService, {
     useFactory: (dependencyContainer) => {
-        const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-        return new AndroidService(manager);
+        const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
+        const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+        const output = dependencyContainer.resolve<Output>(TYPES.Output);
+        const sdkInstaller = dependencyContainer.resolve<SdkInstallerService>(TYPES.SdkInstallerService);
+        return new AndroidService(cache, configService, output, sdkInstaller);
     },
 });
 ```
@@ -133,8 +133,9 @@ import { MyNewService } from '../service/MyNewService';
 
 container.register<MyNewService>(TYPES.MyNewService, {
     useFactory: (dependencyContainer) => {
-        const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-        return new MyNewService(manager);
+        const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+        const output = dependencyContainer.resolve<Output>(TYPES.Output);
+        return new MyNewService(configService, output);
     },
 });
 ```
@@ -154,8 +155,8 @@ const myService = resolve<MyNewService>(TYPES.MyNewService);
 
 ```typescript
 import { resolve, TYPES } from './di';
+import { AndroidService } from './service/AndroidService';
 
-const manager = resolve<Manager>(TYPES.Manager);
 const androidService = resolve<AndroidService>(TYPES.AndroidService);
 ```
 
@@ -163,9 +164,10 @@ const androidService = resolve<AndroidService>(TYPES.AndroidService);
 
 ```typescript
 import { getContainer, TYPES } from './di';
+import { ConfigService } from './config';
 
 const container = getContainer();
-const manager = container.resolve<Manager>(TYPES.Manager);
+const config = container.resolve<ConfigService>(TYPES.ConfigService);
 ```
 
 ### Factory Pattern
@@ -190,21 +192,16 @@ container.register<MyService>(TYPES.MyService, {
 
 **Before:**
 ```typescript
+// Old singleton pattern (no longer exists)
 const manager = Manager.getInstance();
 const androidService = manager.android;
 ```
 
-**After (Option 1 - Keep Singleton):**
-```typescript
-// Still works - backward compatible
-const manager = Manager.getInstance();
-const androidService = manager.android;
-```
-
-**After (Option 2 - Use DI):**
+**After (Use DI):**
 ```typescript
 import { resolve, TYPES } from './di';
-const manager = resolve<Manager>(TYPES.Manager);
+import { AndroidService } from './service/AndroidService';
+
 const androidService = resolve<AndroidService>(TYPES.AndroidService);
 ```
 
@@ -227,6 +224,7 @@ const androidService = resolve<AndroidService>(TYPES.AndroidService);
 
 **Before:**
 ```typescript
+// Old singleton pattern (no longer exists)
 vscode.commands.registerCommand('my.command', async () => {
     const manager = Manager.getInstance();
     await manager.android.initCheck();
@@ -256,7 +254,8 @@ export async function activate(context: vscode.ExtensionContext) {
     setupContainer(context);
 
     // Then resolve dependencies
-    const manager = resolve<Manager>(TYPES.Manager);
+    const androidService = resolve<AndroidService>(TYPES.AndroidService);
+    await androidService.initCheck();
 }
 ```
 
@@ -264,10 +263,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
 ```typescript
 // ✅ Good: Type-safe
-const manager = resolve<Manager>(TYPES.Manager);
+const androidService = resolve<AndroidService>(TYPES.AndroidService);
 
 // ❌ Bad: No type safety
-const manager = resolve(TYPES.Manager) as Manager;
+const androidService = resolve(TYPES.AndroidService) as AndroidService;
 ```
 
 ### 3. Resolve at Usage Point

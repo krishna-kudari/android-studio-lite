@@ -28,6 +28,13 @@
           "title": "Android Studio Lite",
           "icon": "assets/android-studio.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "android-studio-lite-panel",
+          "title": "Android Studio Lite",
+          "icon": "assets/android-studio.svg"
+        }
       ]
     },
     "views": {
@@ -50,9 +57,23 @@
           "contextualTitle": "Build Variant",
           "when": "true"
         }
+      ],
+      "android-studio-lite-panel": [
+        {
+          "id": "android-studio-lite-logcat",
+          "name": "Logcat",
+          "type": "webview",
+          "when": "true"
+        }
       ]
     },
     "commands": [
+      {
+        "command": "android-studio-lite.showOnboarding",
+        "title": "Show Onboarding",
+        "icon": "$(book)",
+        "when": "true"
+      },
       {
         "command": "android-studio-lite.selectBuildVariant",
         "title": "Select Build Variant",
@@ -416,7 +437,14 @@
     "watch:extension": "tsc -watch -p ./",
     "watch:webviews": "webpack --mode development --watch",
     "build": "npm run compile",
-    "build:quick": "webpack --mode production --env quick=true"
+    "build:quick": "webpack --mode production --env quick=true",
+    "test": "npm run test:unit && npm run test:extension",
+    "test:unit": "jest",
+    "test:unit:watch": "jest --watch",
+    "test:unit:coverage": "jest --coverage",
+    "test:extension": "npm run compile:extension && vscode-test",
+    "test:extension:watch": "npm run watch:extension & vscode-test --watch",
+    "pretest": "npm run compile:extension"
   },
   "dependencies": {
     "@lit/context": "^1.1.2",
@@ -425,17 +453,23 @@
     "tsyringe": "^4.10.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/mocha": "^10.0.6",
     "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.3.9",
     "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^7.1.2",
     "css-minimizer-webpack-plugin": "^7.0.0",
     "esbuild-loader": "^4.1.1",
     "html-webpack-plugin": "^5.6.0",
+    "jest": "^29.7.0",
     "mini-css-extract-plugin": "^2.9.0",
     "sass": "^1.80.0",
     "sass-loader": "^16.0.2",
     "terser-webpack-plugin": "^5.3.10",
+    "ts-jest": "^29.1.2",
     "ts-loader": "^9.5.1",
     "typescript": "^5.0.0",
     "webpack": "^5.95.0",

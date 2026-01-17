@@ -29,7 +29,9 @@ export function strformat(str: string, ...params: string[]): string {
 
     //console.log("strformat", str, params);
     for (let index = 0; index < params.length; index++) {
-        out = out.replace("{{" + index + "}}", params[index] ?? "");
+        // Use global replace to replace all occurrences, not just the first one
+        const regex = new RegExp("\\{\\{" + index + "\\}\\}", "g");
+        out = out.replace(regex, params[index] ?? "");
     }
     return out;
 }
@@ -43,7 +45,9 @@ export function strformatNamed(str: string, params?: { [key: string | number]: s
     //console.log("strformatNamed", str, params);
     let p = params as { [key: string]: string };
     for (let index in p) {
-        out = out.replace("{{" + index + "}}", p[index] ?? "");
+        // Use global replace to replace all occurrences, not just the first one
+        const regex = new RegExp("\\{\\{" + index + "\\}\\}", "g");
+        out = out.replace(regex, p[index] ?? "");
     }
 
     return out;

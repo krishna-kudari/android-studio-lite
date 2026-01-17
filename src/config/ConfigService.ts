@@ -268,7 +268,7 @@ export class ConfigService {
     }
 
     /**
-     * Get the full configuration object (for backward compatibility).
+     * Get the full configuration object.
      * This computes all paths based on SDK path.
      */
     getConfig(): IConfig {

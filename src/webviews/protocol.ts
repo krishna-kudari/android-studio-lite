@@ -21,3 +21,15 @@ export interface ExecuteCommandParams {
     command: string;
     args?: unknown[];
 }
+
+export interface OnboardingState extends WebviewState {
+    hasSdk: boolean;
+    sdkPath?: string;
+    platform: 'darwin' | 'win32' | 'linux';
+    sdkInfo?: {
+        hasCommandLineTools: boolean;
+        hasPlatformTools: boolean;
+        hasBuildTools: boolean;
+        hasEmulator: boolean;
+    };
+}

@@ -137,6 +137,37 @@ export class ASlAVDSelectorApp extends ASlElement {
         }));
     }
 
+    private applyAVDs(avds: AVD[], selectedAVD?: string) {
+        this.avds = avds;
+        if (selectedAVD) {
+            this.selectedAVD = selectedAVD;
+            return;
+        }
+        if (!this.selectedAVD && avds.length > 0) {
+            this.selectedAVD = avds[0].name;
+        }
+    }
+
+    private applyModules(modules: Module[], selectedModule?: string) {
+        this.modules = modules;
+        if (selectedModule) {
+            this.selectedModule = selectedModule;
+            return;
+        }
+        if (!this.selectedModule && modules.length > 0) {
+            this.selectedModule = modules[0].module;
+        }
+    }
+
+    private applyBootstrapState(state: any) {
+        if (state.avds) {
+            this.applyAVDs(state.avds, state.selectedAVD);
+        }
+        if (state.modules) {
+            this.applyModules(state.modules, state.selectedModule);
+        }
+    }
+
     private handleAVDChange(e: CustomEvent) {
         const { value } = e.detail;
         if (value !== this.selectedAVD) {
@@ -215,45 +246,22 @@ export class ASlAVDSelectorApp extends ASlElement {
         const message = event.data;
         switch (message.type) {
             case 'update-avds':
-                const { avds } = message.params || {};
+                const { avds, selectedAVD } = message.params || {};
                 if (avds) {
-                    this.avds = avds;
-                    // Select first AVD if none selected
-                    if (!this.selectedAVD && avds.length > 0) {
-                        this.selectedAVD = avds[0].name;
-                    }
+                    this.applyAVDs(avds, selectedAVD);
                 }
                 break;
             case 'update-modules':
-                const { modules } = message.params || {};
+                const { modules, selectedModule } = message.params || {};
                 if (modules) {
-                    this.modules = modules;
-                    // Select first module if none selected
-                    if (!this.selectedModule && modules.length > 0) {
-                        this.selectedModule = modules[0].module;
-                    }
+                    this.applyModules(modules, selectedModule);
                 }
                 break;
             case 'webview/ready':
                 // Handle bootstrap data from ready response
                 if (message.params && message.params.state) {
                     const state = message.params.state;
-                    if (state.avds) {
-                        this.avds = state.avds;
-                        if (state.selectedAVD) {
-                            this.selectedAVD = state.selectedAVD;
-                        } else if (this.avds.length > 0) {
-                            this.selectedAVD = this.avds[0].name;
-                        }
-                    }
-                    if (state.modules) {
-                        this.modules = state.modules;
-                        if (state.selectedModule) {
-                            this.selectedModule = state.selectedModule;
-                        } else if (this.modules.length > 0) {
-                            this.selectedModule = this.modules[0].module;
-                        }
-                    }
+                    this.applyBootstrapState(state);
                 }
                 break;
             case 'build-started':
@@ -304,21 +312,8 @@ export class ASlAVDSelectorApp extends ASlElement {
                 const bootstrap = typeof bootstrapStr === 'string'
                     ? JSON.parse(atob(bootstrapStr))
                     : bootstrapStr;
-                if (bootstrap && bootstrap.avds) {
-                    this.avds = bootstrap.avds;
-                    if (bootstrap.selectedAVD) {
-                        this.selectedAVD = bootstrap.selectedAVD;
-                    } else if (this.avds.length > 0) {
-                        this.selectedAVD = this.avds[0].name;
-                    }
-                }
-                if (bootstrap && bootstrap.modules) {
-                    this.modules = bootstrap.modules;
-                    if (bootstrap.selectedModule) {
-                        this.selectedModule = bootstrap.selectedModule;
-                    } else if (this.modules.length > 0) {
-                        this.selectedModule = this.modules[0].module;
-                    }
+                if (bootstrap) {
+                    this.applyBootstrapState(bootstrap);
                 }
             } catch (e) {
                 console.error('Failed to parse bootstrap data:', e);

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AppError } from "./AppError";
-import type { Output } from '../module/ui';
+import type { Output } from '../module/output';
 
 /**
  * Centralized error handler for the extension.

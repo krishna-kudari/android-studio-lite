@@ -1,5 +1,8 @@
-import { Manager, ConfigItem, ConfigScope } from "../core";
+import { injectable, inject } from 'tsyringe';
 import { Service } from "./Service";
+import { TYPES } from '../di/types';
+import { Cache } from '../module/cache';
+import { Output } from '../module/output';
 import { MsgType, showQuickPick, showMsg, showTargetOfSettingsSelectionMsg, showYesNoMsg } from '../module/ui';
 import { checkExecutable, checkPathExists } from "../module/util";
 import { commands, env, OpenDialogOptions, QuickPickItem, Uri, window, ProgressLocation } from "vscode";
@@ -9,32 +12,56 @@ import { Platform } from "../module/platform";
 import { execWithMsg } from "../module/cmd";
 import { AndroidSdkDetector, SetupIssue } from "../utils/androidSdkDetector";
 import { SdkInstallerService } from "./SdkInstallerService";
+import { ConfigService, ConfigKeys, ConfigScope, ConfigKey } from '../config';
 
+@injectable()
 export class AndroidService extends Service {
-    private sdkInstaller: SdkInstallerService;
+    constructor(
+        @inject(TYPES.Cache) cache: Cache,
+        @inject(TYPES.ConfigService) configService: ConfigService,
+        @inject(TYPES.Output) output: Output,
+        @inject(TYPES.SdkInstallerService) private readonly sdkInstaller: SdkInstallerService
+    ) {
+        super(cache, configService, output);
+    }
 
-    constructor(protected manager: Manager) {
-        super(manager);
-        this.sdkInstaller = new SdkInstallerService(manager);
+    /**
+     * Helper method to set config using ConfigService.
+     */
+    private async setConfig(key: ConfigKey, value: any, scope: ConfigScope): Promise<void> {
+        await this.configService.set(key, value, scope);
+    }
+
+    /**
+     * Get platform (replaces manager.getPlatform()).
+     */
+    private getPlatform(): Platform {
+        switch (process.platform) {
+            case 'linux':
+                return Platform.linux;
+            case 'darwin':
+                return Platform.macOS;
+        }
+        return Platform.window;
     }
 
     public async initCheck() {
-        this.manager.output.append("Config Checking start 👓 ... ");
+        this.output.append("Config Checking start 👓 ... ");
         let configChanged = false;
         let mayFail = false;
 
-        this.manager.output.show();
+        this.output.show();
 
         let config = this.getConfig();
         let sdkPathLookup = this.lookupSDKPath();
 
         // Try auto-detection if SDK path is not found
         if (sdkPathLookup !== 0) {
-            this.manager.output.append("SDK Root Path not found. Attempting auto-detection...");
+            this.output.append("SDK Root Path not found. Attempting auto-detection...");
             const detectedSdkPath = AndroidSdkDetector.detectSdkPath();
 
             if (detectedSdkPath) {
-                this.manager.output.append(`Auto-detected SDK path: ${detectedSdkPath}`);
+                this.output.append(`Auto-detected SDK path: ${detectedSdkPath}`);
                 const result = await showMsg(
                     MsgType.info,
                     `Found Android SDK at: ${detectedSdkPath}\n\nWould you like to use this path?`,
@@ -47,15 +74,15 @@ export class AndroidService extends Service {
                 if (result === "Use Detected Path") {
                     const target = await showTargetOfSettingsSelectionMsg();
                     if (target !== "Cancel") {
-                        const scope = target === "Global" ? ConfigScope.global :
-                            target === "Workspace (Folder)" ? ConfigScope.folder :
-                                ConfigScope.globalnfolder;
-                        await this.manager.setConfig(ConfigItem.sdkPath, detectedSdkPath, scope);
+                        const scope = target === "Global" ? ConfigScope.Global :
+                            target === "Workspace (Folder)" ? ConfigScope.Folder :
+                                ConfigScope.GlobalAndFolder;
+                        await this.setConfig(ConfigKeys.SDK_PATH, detectedSdkPath, scope);
                         configChanged = true;
                         config = this.getConfig();
                     }
                 } else if (result === "Select Manually") {
-                    let newpath = await this.updatePathDiag("dir", ConfigItem.sdkPath, "Please select the Android SDK Root Path", "Android SDK Root path updated!", "Android SDK path not specified!");
+                    let newpath = await this.updatePathDiag("dir", ConfigKeys.SDK_PATH, "Please select the Android SDK Root Path", "Android SDK Root path updated!", "Android SDK path not specified!");
                     if (newpath !== "") {
                         configChanged = true;
                         config = this.getConfig();
@@ -80,7 +107,7 @@ export class AndroidService extends Service {
                     await this.showSetupInstructions('missing_sdk');
                     return;
                 } else if (result === "Select SDK Path Manually") {
-                    let newpath = await this.updatePathDiag("dir", ConfigItem.sdkPath, "Please select the Android SDK Root Path", "Android SDK Root path updated!", "Android SDK path not specified!");
+                    let newpath = await this.updatePathDiag("dir", ConfigKeys.SDK_PATH, "Please select the Android SDK Root Path", "Android SDK Root path updated!", "Android SDK path not specified!");
                     if (newpath !== "") {
                         configChanged = true;
                         config = this.getConfig();
@@ -100,27 +127,27 @@ export class AndroidService extends Service {
             const sdkInfo = AndroidSdkDetector.analyzeSdk(config.sdkPath);
             const issues = AndroidSdkDetector.identifyIssues(sdkInfo);
 
-            this.manager.output.append("SDK Root Path:            " + config.sdkPath);
-            this.manager.output.append("SDK Command-Line Tools:   " + config.cmdPath);
-            this.manager.output.append("SDK Build Tools:          " + config.buildToolPath);
-            this.manager.output.append("SDK Platform Tools:       " + config.platformToolsPath);
-            this.manager.output.append("Emulator Path:            " + config.emuPath);
+            this.output.append("SDK Root Path:            " + config.sdkPath);
+            this.output.append("SDK Command-Line Tools:   " + config.cmdPath);
+            this.output.append("SDK Build Tools:          " + config.buildToolPath);
+            this.output.append("SDK Platform Tools:       " + config.platformToolsPath);
+            this.output.append("Emulator Path:            " + config.emuPath);
 
             // Check each component
             if (sdkInfo.hasCommandLineTools) {
-                this.manager.output.append(" -- check OK 👍");
+                this.output.append(" -- check OK 👍");
             } else {
-                this.manager.output.append(" -- ⚠️  Command-Line Tools not found");
+                this.output.append(" -- ⚠️  Command-Line Tools not found");
                 mayFail = true;
             }
-            this.manager.output.append("\n");
+            this.output.append("\n");
 
             // Show issues and offer auto-installation
             const missingComponents: SetupIssue[] = [];
             for (const issue of issues) {
                 if (issue.severity === 'error' || issue.type === 'missing_cmdline_tools') {
                     missingComponents.push(issue);
-                    this.manager.output.append(`\n⚠️  ${issue.message}`);
+                    this.output.append(`\n⚠️  ${issue.message}`);
                 }
             }
 
@@ -164,26 +191,26 @@ export class AndroidService extends Service {
                                 const updatedSdkInfo = AndroidSdkDetector.analyzeSdk(config.sdkPath);
 
                                 // Update status in output
-                                this.manager.output.append("\n📦 Installation Summary:");
+                                this.output.append("\n📦 Installation Summary:");
                                 if (updatedSdkInfo.hasCommandLineTools) {
-                                    this.manager.output.append("✅ Command-Line Tools: Installed");
+                                    this.output.append("✅ Command-Line Tools: Installed");
                                 }
                                 if (updatedSdkInfo.hasPlatformTools) {
-                                    this.manager.output.append("✅ Platform Tools: Installed");
+                                    this.output.append("✅ Platform Tools: Installed");
                                 }
                                 if (updatedSdkInfo.hasBuildTools) {
-                                    this.manager.output.append("✅ Build Tools: Installed");
+                                    this.output.append("✅ Build Tools: Installed");
                                 }
                                 if (updatedSdkInfo.hasEmulator) {
-                                    this.manager.output.append("✅ Emulator: Installed");
+                                    this.output.append("✅ Emulator: Installed");
                                 }
 
                                 // Re-run AVD Manager check
                                 if (updatedSdkInfo.hasCommandLineTools) {
-                                    this.manager.output.append("\nVerifying AVD Manager...");
+                                    this.output.append("\nVerifying AVD Manager...");
                                     try {
                                         await this.checkAVDManager();
-                                        this.manager.output.append("AVD Manager: ✅ Working");
+                                        this.output.append("AVD Manager: ✅ Working");
                                         mayFail = false; // Update status since we fixed it
                                     } catch (e) {
                                         // Still might fail, but less likely
@@ -202,7 +229,7 @@ export class AndroidService extends Service {
                                 `Auto-installation failed: ${error.message}\n\nPlease try manual installation or check the output panel for details.`,
                                 {}
                             );
-                            this.manager.output.append(`\n[ERR] Installation error: ${error.message}`, "error");
+                            this.output.append(`\n[ERR] Installation error: ${error.message}`, "error");
                             // Show instructions as fallback
                             const cmdlineIssue = missingComponents.find(i => i.type === 'missing_cmdline_tools');
                             if (cmdlineIssue) {
@@ -237,15 +264,15 @@ export class AndroidService extends Service {
         }
 
         //check avd
-        this.manager.output.append("AVD Manager path:         " + this.getAVDManager());
+        this.output.append("AVD Manager path:         " + this.getAVDManager());
         await this.checkAVDManager().then((o) => {
-            this.manager.output.append(" -- check OK 👍");
+            this.output.append(" -- check OK 👍");
         }).catch(async (e) => {
             const config = this.getConfig();
             const sdkInfo = AndroidSdkDetector.analyzeSdk(config.sdkPath);
 
             if (!sdkInfo.hasCommandLineTools) {
-                this.manager.output.append(" -- ⚠️  Command-Line Tools required for AVD Manager");
+                this.output.append(" -- ⚠️  Command-Line Tools required for AVD Manager");
                 const result = await showMsg(
                     MsgType.warning,
                     "AVD Manager requires Command-Line Tools.\n\nWould you like to see installation instructions?",
@@ -263,13 +290,13 @@ export class AndroidService extends Service {
             } else {
                 let result = await showMsg(MsgType.warning, "AVD Manager Not found/Not exist!", {}, "Update Path", "Skip");
                 if (result === "Update Path") {
-                    let newpath = await this.updatePathDiag("file", ConfigItem.executable, "Please select the AVDManager Path", "AVDManager updated!", "AVDManager path not specified!");
+                    let newpath = await this.updatePathDiag("file", ConfigKeys.EXECUTABLE, "Please select the AVDManager Path", "AVDManager updated!", "AVDManager path not specified!");
                     if (newpath !== "") {
                         configChanged = true;
-                        this.manager.output.append("AVD Manager path:         " + newpath);
+                        this.output.append("AVD Manager path:         " + newpath);
                     } else {
                         mayFail = true;
-                        this.manager.output.append("AVDManager path not specified!");
+                        this.output.append("AVDManager path not specified!");
                     }
                 }
             }
@@ -280,26 +307,26 @@ export class AndroidService extends Service {
         if (config.avdHome === ""){
             avdHome = "System Default";
         }
-        this.manager.output.append("AVD Home path:            " + avdHome);
-        this.manager.output.append("");
+        this.output.append("AVD Home path:            " + avdHome);
+        this.output.append("");
 
         //check emu
-        this.manager.output.append("Emulator path:            " + this.getEmulator());
+        this.output.append("Emulator path:            " + this.getEmulator());
         await this.checkEmulator().then((o) => {
-            this.manager.output.append(" -- check OK 👍");
+            this.output.append(" -- check OK 👍");
         }).catch(async (e) => {
             let result = await showMsg(MsgType.warning, "Emulator Not found/Not exist!", {}, "Update Emulator Path", "Skip");
             if (result === "Update Emulator Path") {
-                let newpath = await this.updatePathDiag("file", ConfigItem.emulator, "Please select the Emulator Path", "Emulator path updated!", "Emulator path not specified!");
+                let newpath = await this.updatePathDiag("file", ConfigKeys.EMULATOR_PATH, "Please select the Emulator Path", "Emulator path updated!", "Emulator path not specified!");
                 if (newpath !== "") {
                     configChanged = true;
-                    this.manager.output.append("Emulator path:            " + newpath);
+                    this.output.append("Emulator path:            " + newpath);
                 } else {
                     mayFail = true;
-                    this.manager.output.append("Emulator path not specified / fail!😓");
+                    this.output.append("Emulator path not specified / fail!😓");
                 }
             } else {
-                this.manager.output.append("Emulator path not specified / fail!😓");
+                this.output.append("Emulator path not specified / fail!😓");
                 mayFail = true;
             }
         });
@@ -311,16 +338,16 @@ export class AndroidService extends Service {
             }
         } else {
             if (mayFail) {
-                this.manager.output.append("\n⚠️  Some configuration issues detected. Some features may not work correctly.");
-                this.manager.output.append("Please check the setup instructions above or use the command palette:");
-                this.manager.output.append("  - Android Studio Lite: Update SDK Root Path");
-                this.manager.output.append("  - Android Studio Lite: Setup AVD Manager");
+                this.output.append("\n⚠️  Some configuration issues detected. Some features may not work correctly.");
+                this.output.append("Please check the setup instructions above or use the command palette:");
+                this.output.append("  - Android Studio Lite: Update SDK Root Path");
+                this.output.append("  - Android Studio Lite: Setup AVD Manager");
             } else {
-                this.manager.output.append("\n✅ Everything looks good! 😎");
+                this.output.append("\n✅ Everything looks good! 😎");
             }
         }
 
-        this.manager.output.show();
+        this.output.show();
     }
 
     private async showSetupInstructions(issueType: string, customSolution?: string) {
@@ -401,7 +428,7 @@ ${html}
         return issue?.solution || "Please refer to the README for setup instructions.";
     }
 
-    public async updatePathDiag(type: string, configkey: string, openDialogTitle: string, successMsg: string, failMsg: string) {
+    public async updatePathDiag(type: string, configkey: ConfigKey, openDialogTitle: string, successMsg: string, failMsg: string) {
         //1. ask dir
         let options: OpenDialogOptions = {
             openLabel: "Update",
@@ -431,13 +458,13 @@ ${html}
                 showMsg(MsgType.info, "Cancelled");
                 return Promise.resolve("");
             }
-            let scope = ConfigScope.folder;
+            let scope = ConfigScope.Folder;
             if (target === "Global") {
-                scope = ConfigScope.global;
+                scope = ConfigScope.Global;
             } else if (target === "Both") {
-                scope = ConfigScope.globalnfolder;
+                scope = ConfigScope.GlobalAndFolder;
             }
-            await this.manager.setConfig(configkey, newpath, scope);
+            await this.setConfig(configkey, newpath, scope);
         }
 
         showMsg(msgType, title);
@@ -454,7 +481,7 @@ ${html}
 
     public getAVDManager() {
         let config = this.getConfig();
-        let platform = this.manager.getPlatform();
+        let platform = this.getPlatform();
         let filenames = ["", "avdmanager.bat", "avdmanager",
             "avdManager.bat", "avdManager",
             "AvdManager.bat", "AvdManager",
@@ -478,7 +505,7 @@ ${html}
 
     public getSDKManager() {
         let config = this.getConfig();
-        let platform = this.manager.getPlatform();
+        let platform = this.getPlatform();
 
         let filenames = ["", "sdkmanager.bat", "sdkmanager",
             "sdkManager.bat", "sdkManager",
@@ -504,7 +531,7 @@ ${html}
 
     public getEmulator() {
         let config = this.getConfig();
-        let platform = this.manager.getPlatform();
+        let platform = this.getPlatform();
 
         let filenames = ["", "emulator.exe", "emulator", "Emulator.exe", "Emulator"];
 
@@ -526,11 +553,11 @@ ${html}
 
     public async checkAVDManager() {
         let exec = this.getAVDManager();
-        return execWithMsg(this.manager, false, exec + " list avd");
+        return execWithMsg(this.output, false, exec + " list avd");
     }
 
     public async checkEmulator() {
         let exec = this.getEmulator();
-        return execWithMsg(this.manager, false, exec + " -version ");
+        return execWithMsg(this.output, false, exec + " -version ");
     }
 }

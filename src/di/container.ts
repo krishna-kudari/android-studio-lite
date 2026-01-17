@@ -4,9 +4,8 @@ import * as vscode from 'vscode';
 import { TYPES } from './types';
 
 // Core services
-import { Manager } from '../core';
 import { ConfigService } from '../config';
-import { Output } from '../module/ui';
+import { Output } from '../module/output';
 import { Cache } from '../module/cache';
 
 // Android services
@@ -15,6 +14,13 @@ import { AVDService } from '../service/AVDService';
 import { BuildVariantService } from '../service/BuildVariantService';
 import { GradleService } from '../service/GradleService';
 import { SdkInstallerService } from '../service/SdkInstallerService';
+import { LogcatService } from '../service/Logcat';
+
+// Command registry
+import { CommandRegistry } from '../commands/CommandRegistry';
+
+// Event system
+import { EventBus } from '../events/EventBus';
 
 /**
  * Setup and configure the dependency injection container.
@@ -34,50 +40,81 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
 
     // Register core utilities as singletons
     container.registerSingleton<ConfigService>(TYPES.ConfigService, ConfigService);
-    container.registerSingleton<Output>(TYPES.Output, Output);
+    // Output needs a factory since it takes a name parameter
+    container.register<Output>(TYPES.Output, {
+        useFactory: () => new Output('Android Studio Lite')
+    });
     container.registerSingleton<Cache>(TYPES.Cache, Cache);
 
-    // Register Manager instance (it's a singleton with private constructor)
-    // We use registerInstance to register the singleton instance directly
-    const managerInstance = Manager.getInstance();
-    container.registerInstance<Manager>(TYPES.Manager, managerInstance);
-
     // Register Android services
-    // These will be resolved with their dependencies injected
+    // AndroidService uses @injectable() decorator, so tsyringe can resolve dependencies automatically
     container.register<AndroidService>(TYPES.AndroidService, {
         useFactory: (dependencyContainer) => {
-            const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-            return new AndroidService(manager);
+            const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
+            const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+            const output = dependencyContainer.resolve<Output>(TYPES.Output);
+            const sdkInstaller = dependencyContainer.resolve<SdkInstallerService>(TYPES.SdkInstallerService);
+            return new AndroidService(cache, configService, output, sdkInstaller);
         },
     });
 
+    // Register Android services with DI
+    // These services use @injectable() decorator, so tsyringe can resolve dependencies automatically
     container.register<AVDService>(TYPES.AVDService, {
         useFactory: (dependencyContainer) => {
-            const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-            return new AVDService(manager);
+            const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
+            const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+            const output = dependencyContainer.resolve<Output>(TYPES.Output);
+            const androidService = dependencyContainer.resolve<AndroidService>(TYPES.AndroidService);
+            const context = dependencyContainer.resolve<vscode.ExtensionContext>(TYPES.ExtensionContext);
+            return new AVDService(cache, configService, output, androidService, context);
         },
     });
 
     container.register<BuildVariantService>(TYPES.BuildVariantService, {
         useFactory: (dependencyContainer) => {
-            const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-            return new BuildVariantService(manager);
+            const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
+            const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+            const output = dependencyContainer.resolve<Output>(TYPES.Output);
+            const context = dependencyContainer.resolve<vscode.ExtensionContext>(TYPES.ExtensionContext);
+            return new BuildVariantService(cache, configService, output, context);
         },
     });
 
     container.register<GradleService>(TYPES.GradleService, {
         useFactory: (dependencyContainer) => {
-            const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-            return new GradleService(manager);
+            const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
+            const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+            const output = dependencyContainer.resolve<Output>(TYPES.Output);
+            return new GradleService(cache, configService, output);
         },
     });
 
     container.register<SdkInstallerService>(TYPES.SdkInstallerService, {
         useFactory: (dependencyContainer) => {
-            const manager = dependencyContainer.resolve<Manager>(TYPES.Manager);
-            return new SdkInstallerService(manager);
+            const output = dependencyContainer.resolve<Output>(TYPES.Output);
+            return new SdkInstallerService(output);
         },
     });
+
+    // Register LogcatService (from Logcat.ts) - needs factory
+    container.register<LogcatService>(TYPES.LogcatService, {
+        useFactory: (dependencyContainer) => {
+            const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
+            const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
+            const output = dependencyContainer.resolve<Output>(TYPES.Output);
+            const avdService = dependencyContainer.resolve<AVDService>(TYPES.AVDService);
+            const buildVariantService = dependencyContainer.resolve<BuildVariantService>(TYPES.BuildVariantService);
+            return new LogcatService(cache, configService, output, avdService, buildVariantService);
+        },
+    });
+
+    // Register Command Registry as singleton
+    container.registerSingleton<CommandRegistry>(TYPES.CommandRegistry, CommandRegistry);
+
+    // Register EventBus as singleton
+    const eventBus = EventBus.getInstance();
+    container.registerInstance<EventBus>(TYPES.EventBus, eventBus);
 
     return container;
 }

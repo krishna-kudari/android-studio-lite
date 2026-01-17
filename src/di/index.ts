@@ -6,13 +6,12 @@
  * @example
  * ```typescript
  * import { setupContainer, resolve, TYPES } from './di';
- * import { Manager } from '../core';
+ * import { AndroidService } from '../service/AndroidService';
  *
  * // Setup container during extension activation
  * const container = setupContainer(context);
  *
  * // Resolve dependencies
- * const manager = resolve<Manager>(TYPES.Manager);
  * const androidService = resolve<AndroidService>(TYPES.AndroidService);
  * ```
  */

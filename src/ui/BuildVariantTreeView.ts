@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Manager } from '../core';
+import { BuildVariantService } from '../service/BuildVariantService';
 import { showMsg, showQuickPick, MsgType } from '../module/ui';
 import { subscribe } from '../module/';
 import { BuildVariantQuickPickItem } from './BuildVariantQuickPick';
@@ -11,8 +11,8 @@ export class BuildVariantTreeView {
     readonly provider: BuildVariantTreeDataProvider;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
 
-    constructor(context: vscode.ExtensionContext, private manager: Manager) {
-        this.provider = new BuildVariantTreeDataProvider(this.manager, context);
+    constructor(context: vscode.ExtensionContext, private buildVariantService: BuildVariantService) {
+        this.provider = new BuildVariantTreeDataProvider(this.buildVariantService, context);
 
         const view = vscode.window.createTreeView('android-studio-lite-build-variant', {
             treeDataProvider: this.provider,
@@ -63,31 +63,31 @@ export class BuildVariantTreeView {
 
         this.fileWatcher.onDidChange(() => {
             console.log('[BuildVariantTreeView] build.gradle file changed, clearing cache');
-            this.manager.buildVariant.clearCache();
+            this.buildVariantService.clearCache();
             this.provider.refresh();
         });
 
         this.fileWatcher.onDidCreate(() => {
             console.log('[BuildVariantTreeView] build.gradle file created, clearing cache');
-            this.manager.buildVariant.clearCache();
+            this.buildVariantService.clearCache();
             this.provider.refresh();
         });
 
         this.fileWatcher.onDidDelete(() => {
             console.log('[BuildVariantTreeView] build.gradle file deleted, clearing cache');
-            this.manager.buildVariant.clearCache();
+            this.buildVariantService.clearCache();
             this.provider.refresh();
         });
     }
 
     refresh = async () => {
         // Clear cache and refresh the tree view - this will reload modules and variants
-        this.manager.buildVariant.clearCache();
+        this.buildVariantService.clearCache();
         this.provider.refresh();
     };
 
     async getBuildVariantQuickPickItems(moduleName: string): Promise<BuildVariantQuickPickItem[] | undefined> {
-        const modules = await this.manager.buildVariant.getModuleBuildVariants(this.provider.context);
+        const modules = await this.buildVariantService.getModuleBuildVariants(this.provider.context);
         const module = modules.find(m => m.module === moduleName);
 
         if (!module || !module.variants || module.variants.length === 0) {
@@ -103,7 +103,7 @@ export class BuildVariantTreeView {
             return;
         }
 
-        const modules = await this.manager.buildVariant.getModuleBuildVariants(this.provider.context);
+        const modules = await this.buildVariantService.getModuleBuildVariants(this.provider.context);
         const module = modules.find(m => m.module === moduleName);
 
         if (!module) {
@@ -154,7 +154,7 @@ type TreeItem = BuildVariantTreeItem;
 
 class BuildVariantTreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     constructor(
-        private manager: Manager,
+        private buildVariantService: BuildVariantService,
         public readonly context: vscode.ExtensionContext
     ) { }
 
@@ -164,7 +164,7 @@ class BuildVariantTreeDataProvider implements vscode.TreeDataProvider<TreeItem> 
 
     async getChildren(element?: TreeItem): Promise<TreeItem[]> {
         try {
-            const modules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
+            const modules = await this.buildVariantService.getModuleBuildVariants(this.context);
 
             if (!modules || modules.length === 0) {
                 return [];

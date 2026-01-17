@@ -1,5 +1,5 @@
 import { QuickPickItem } from "vscode";
-import { BuildVariantModel } from "../cmd/BuildVariant";
+import { BuildVariantModel } from "../cmd/Gradle";
 
 export class BuildVariantQuickPickItem implements QuickPickItem {
     label: string;

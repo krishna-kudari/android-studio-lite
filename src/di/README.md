@@ -26,7 +26,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const container = setupContainer(context);
 
     // Resolve dependencies
-    const manager = resolve<Manager>(TYPES.Manager);
+    const androidService = resolve<AndroidService>(TYPES.AndroidService);
+    await androidService.initCheck();
 }
 ```
 
@@ -45,7 +46,7 @@ await androidService.initCheck();
 - ✅ **Type-Safe Resolution** - TypeScript ensures correct dependency types
 - ✅ **Singleton Management** - Automatic singleton lifecycle
 - ✅ **Factory Support** - Custom instantiation logic
-- ✅ **Backward Compatible** - Works alongside existing singleton pattern
+- ✅ **Fully Integrated** - All services use DI
 - ✅ **Test-Friendly** - Easy to mock dependencies
 
 ## 📚 Documentation
@@ -76,17 +77,17 @@ export async function activate(context: vscode.ExtensionContext) {
 
 ## 🔄 Migration
 
-Existing code continues to work:
+All services now use Dependency Injection:
 
 ```typescript
-// Old way (still works)
-const manager = Manager.getInstance();
+// Resolve services from DI container
+import { resolve, TYPES } from './di';
+import { AndroidService } from './service/AndroidService';
 
-// New way (recommended for new code)
-const manager = resolve<Manager>(TYPES.Manager);
+const androidService = resolve<AndroidService>(TYPES.AndroidService);
 ```
 
-See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed migration examples.
+See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed usage examples.
 
 ## 📦 Dependencies
 
@@ -97,7 +98,6 @@ See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed migration examples.
 
 All services are registered with symbols in `TYPES`:
 
-- `TYPES.Manager` - Manager singleton
 - `TYPES.ConfigService` - Configuration service
 - `TYPES.Output` - Output channel
 - `TYPES.Cache` - Cache utility

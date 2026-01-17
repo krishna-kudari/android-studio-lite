@@ -1,4 +1,4 @@
-import { IConfig, Manager } from '../core';
+import { Output } from '../module/output';
 import { ICommandProp, Executable, CommandType } from './Executable';
 
 export interface AVDDevice {
@@ -133,8 +133,8 @@ let commands: { [key in Command]?: ICommandProp } = {
 
 
 export class AVDManager extends Executable {
-    constructor(manager: Manager) {
-        super(manager, manager.android.getAVDManager() ?? "", commands);
+    constructor(output: Output, executable: string) {
+        super(output, executable, commands);
     }
 }
 

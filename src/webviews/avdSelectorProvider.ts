@@ -2,9 +2,13 @@ import type { Disposable, ExtensionContext } from 'vscode';
 import { Disposable as VSCodeDisposable, window, commands, ProgressLocation, CancellationTokenSource } from 'vscode';
 import type { WebviewProvider, WebviewHost } from './webviewProvider.js';
 import type { WebviewState } from './protocol.js';
-import { Manager } from '../core';
 import type { AVD } from '../cmd/AVDManager';
 import type { MuduleBuildVariant } from '../service/BuildVariantService';
+import { AVDService } from '../service/AVDService';
+import { BuildVariantService } from '../service/BuildVariantService';
+import { GradleService } from '../service/GradleService';
+import { Output } from '../module/output';
+import { ConfigService } from '../config';
 
 export interface AVDSelectorWebviewState extends WebviewState {
     avds?: AVD[];
@@ -15,15 +19,28 @@ export interface AVDSelectorWebviewState extends WebviewState {
 
 export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewState> {
     private readonly disposables: Disposable[] = [];
-    private readonly manager: Manager;
+    private readonly avdService: AVDService;
+    private readonly buildVariantService: BuildVariantService;
+    private readonly gradleService: GradleService;
+    private readonly output: Output;
+    private readonly configService: ConfigService;
     private buildCancellationTokens = new Map<string, CancellationTokenSource>();
     private logcatActive: boolean = false;
 
     constructor(
         private readonly host: WebviewHost,
-        private readonly context: ExtensionContext
+        private readonly context: ExtensionContext,
+        avdService: AVDService,
+        buildVariantService: BuildVariantService,
+        gradleService: GradleService,
+        output: Output,
+        configService: ConfigService
     ) {
-        this.manager = Manager.getInstance();
+        this.avdService = avdService;
+        this.buildVariantService = buildVariantService;
+        this.gradleService = gradleService;
+        this.output = output;
+        this.configService = configService;
     }
 
     getTelemetryContext(): Record<string, string | number | boolean | undefined> {
@@ -34,24 +51,35 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     }
 
     async includeBootstrap(): Promise<AVDSelectorWebviewState> {
-        const avds = await this.manager.avd.getAVDList();
+        const avds = await this.avdService.getAVDList();
         const avdList = avds || [];
-        const selectedAVD = avdList.length > 0 ? avdList[0].name : undefined;
+        let selectedAVD = this.avdService.getSelectedAVDName() || undefined;
+        if (!selectedAVD && avdList.length > 0) {
+            await this.avdService.setSelectedAVDName(avdList[0].name);
+            selectedAVD = avdList[0].name;
+        }
 
         // Get modules and filter for application type
         let modules: MuduleBuildVariant[] = [];
         try {
-            const allModules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
+            const allModules = await this.buildVariantService.getModuleBuildVariants(this.context);
             modules = allModules.filter(m => m.type === 'application');
         } catch (error) {
             console.error('[AVDSelectorProvider] Error loading modules:', error);
         }
-        const selectedModule = modules.length > 0 ? modules[0].module : undefined;
+
+        // Get selected module from BuildVariantService
+        let selectedModule = this.buildVariantService.getSelectedModule() || undefined;
+        // If no module selected, default to first module
+        if (!selectedModule && modules.length > 0) {
+            selectedModule = modules[0].module;
+            await this.buildVariantService.setSelectedModule(selectedModule);
+        }
 
         // Check current logcat state
         try {
             // Try to check if logcat is running by checking if Logcat output channel exists and is visible
-            // This is a best-effort check since we don't have direct access to LogcatProvider
+            // This is a best-effort check since we don't have direct access to LogcatService here
             this.logcatActive = false; // Default to false, will be updated when user toggles
         } catch (error) {
             console.error('[AVDSelectorProvider] Error checking logcat state:', error);
@@ -75,7 +103,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         await this.host.notify('logcat-state-changed', { active: this.logcatActive });
     }
 
-    onMessageReceived?(e: any): void {
+    async onMessageReceived?(e: any): Promise<void> {
         if (e.type === 'refresh-avds') {
             void this.sendAVDList();
         } else if (e.type === 'refresh-modules') {
@@ -83,12 +111,16 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         } else if (e.type === 'select-avd') {
             const { avdName } = e.params || {};
             if (avdName) {
+                void this.avdService.setSelectedAVDName(avdName);
                 void this.host.notify('avd-selected', { avdName });
             }
         } else if (e.type === 'select-module') {
             const { moduleName } = e.params || {};
             if (moduleName) {
+                await this.buildVariantService.setSelectedModule(moduleName);
                 void this.host.notify('module-selected', { moduleName });
+                // Update modules to reflect selected module
+                await this.sendModules();
             }
         } else if (e.type === 'run-app') {
             void this.handleRunApp(e.params);
@@ -124,7 +156,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
             }
 
             // Get selected build variant for the module
-            const modules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
+            const modules = await this.buildVariantService.getModuleBuildVariants(this.context);
             const module = modules.find(m => m.module === moduleName && m.type === 'application');
             if (!module || !module.variants || module.variants.length === 0) {
                 await this.host.notify('build-failed', { error: 'No build variants found for module' });
@@ -158,7 +190,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                     // Link cancellation tokens
                     token.onCancellationRequested(() => {
                         cancelToken.cancel();
-                        this.manager.gradle.cancelBuild();
+                        this.gradleService.cancelBuild();
                     });
 
                     try {
@@ -166,7 +198,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                         console.log(`[AVDSelectorProvider] Starting gradle install task: ${installTask}`);
 
                         // Install variant (this will build and install)
-                        await this.manager.gradle.installVariant(
+                        await this.gradleService.installVariant(
                             installTask,
                             (output) => {
                                 // Show progress from Gradle output
@@ -236,7 +268,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
             const cancelToken = this.buildCancellationTokens.get(cancellationToken);
             if (cancelToken) {
                 cancelToken.cancel();
-                this.manager.gradle.cancelBuild();
+                this.gradleService.cancelBuild();
                 this.buildCancellationTokens.delete(cancellationToken);
                 await this.host.notify('build-cancelled', {});
             }
@@ -252,12 +284,12 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                 // Start logcat and show logcat output channel
                 await commands.executeCommand('android-studio-lite.startLogcat');
                 // Hide Android Studio Lite output channel
-                this.manager.output.hide();
+                this.output.hide();
             } else {
                 // Stop logcat and show Android Studio Lite output channel
                 await commands.executeCommand('android-studio-lite.stopLogcat');
                 // Show Android Studio Lite output channel
-                this.manager.output.show();
+                this.output.show();
             }
             // Notify webview of state change
             await this.host.notify('logcat-state-changed', { active: this.logcatActive });
@@ -276,6 +308,20 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
 
         if (isRunning) {
             console.log(`[AVDSelectorProvider] AVD ${avdName} is already running, skipping launch`);
+            // Ensure device ID is set even if AVD is already running
+            await this.avdService.refreshDevices(true);
+            const selectedDeviceId = this.avdService.getSelectedDeviceId();
+            if (!selectedDeviceId) {
+                // Try to find device by AVD name and select it
+                const devices = this.avdService.getOnlineDevices();
+                const matchingDevice = devices.find(d => d.avdName === avdName);
+                if (matchingDevice) {
+                    await this.avdService.selectDevice(matchingDevice.id);
+                } else if (devices.length > 0) {
+                    // Fallback: select first online device
+                    await this.avdService.selectDevice(devices[0].id);
+                }
+            }
             return;
         }
 
@@ -293,7 +339,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                     try {
                         progress.report({ increment: 0, message: 'Starting emulator...' });
                         // Launch emulator (this spawns and returns immediately)
-                        await this.manager.avd.launchEmulator(avdName);
+                        await this.avdService.launchEmulator(avdName);
 
                         // Wait for device to be ready (poll for up to 60 seconds)
                         progress.report({ increment: 30, message: 'Waiting for device...' });
@@ -319,6 +365,22 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                             throw new Error('Emulator started but device not detected. Please check if emulator is running.');
                         }
                         progress.report({ increment: 100, message: 'Device ready!' });
+
+                        // Refresh devices and ensure device ID is set for the AVD
+                        await this.avdService.refreshDevices(true);
+                        const selectedDeviceId = this.avdService.getSelectedDeviceId();
+                        if (!selectedDeviceId) {
+                            // Try to find device by AVD name and select it
+                            const devices = this.avdService.getOnlineDevices();
+                            const matchingDevice = devices.find(d => d.avdName === avdName);
+                            if (matchingDevice) {
+                                await this.avdService.selectDevice(matchingDevice.id);
+                            } else if (devices.length > 0) {
+                                // Fallback: select first online device
+                                await this.avdService.selectDevice(devices[0].id);
+                            }
+                        }
+
                         // Small delay to ensure notification closes properly
                         await new Promise(resolve => setTimeout(resolve, 500));
                     } catch (error: any) {
@@ -347,7 +409,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
 
     private async launchApp(applicationId: string): Promise<void> {
         // Get the first available emulator device
-        const config = this.manager.getConfig();
+        const config = this.configService.getConfig();
         const sdkPath = config.sdkPath;
         if (!sdkPath) {
             throw new Error('SDK path not configured');
@@ -468,8 +530,8 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     private async checkIfAVDRunning(avdName: string): Promise<boolean> {
         try {
             // Use ADB to check if device is online
-            // Get platform tools path from Manager's config (more reliable)
-            const config = this.manager.getConfig();
+            // Get platform tools path from ConfigService
+            const config = this.configService.getConfig();
             const sdkPath = config.sdkPath;
 
             if (!sdkPath) {
@@ -517,27 +579,29 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
 
     async onRefresh?(force?: boolean): Promise<void> {
         if (force) {
-            await this.manager.avd.getAVDList(true);
-            this.manager.buildVariant.clearCache();
+            await this.avdService.getAVDList(true);
+            this.buildVariantService.clearCache();
         }
         await this.sendAVDList();
         await this.sendModules();
     }
 
     private async sendAVDList(): Promise<void> {
-        const avds = await this.manager.avd.getAVDList();
+        const avds = await this.avdService.getAVDList();
         const avdList = avds || [];
-        await this.host.notify('update-avds', { avds: avdList });
+        const selectedAVD = this.avdService.getSelectedAVDName();
+        await this.host.notify('update-avds', { avds: avdList, selectedAVD });
     }
 
     private async sendModules(): Promise<void> {
         try {
-            const allModules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
+            const allModules = await this.buildVariantService.getModuleBuildVariants(this.context);
             const modules = allModules.filter(m => m.type === 'application');
-            await this.host.notify('update-modules', { modules });
+            const selectedModule = this.buildVariantService.getSelectedModule() || undefined;
+            await this.host.notify('update-modules', { modules, selectedModule });
         } catch (error) {
             console.error('[AVDSelectorProvider] Error sending modules:', error);
-            await this.host.notify('update-modules', { modules: [] });
+            await this.host.notify('update-modules', { modules: [], selectedModule: undefined });
         }
     }
 

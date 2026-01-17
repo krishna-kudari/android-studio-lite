@@ -1,7 +1,7 @@
 import * as nodePath from 'path';
 import * as vscode from 'vscode';
 import { AVD, AVDDevice } from '../cmd/AVDManager';
-import { Manager } from '../core';
+import { AVDService } from '../service/AVDService';
 import { showMsg, showQuickPick, MsgType, showYesNoQuickPick } from '../module/ui';
 
 import { subscribe } from '../module/';
@@ -13,8 +13,8 @@ import { AVDDeviceQuickPickItem } from './AVDDeviceQuickPick';
 export class AVDTreeView {
     readonly provider: AVDTreeDataProvider;
 
-    constructor(context: vscode.ExtensionContext, private manager: Manager) {
-        this.provider = new AVDTreeDataProvider(this.manager);
+    constructor(context: vscode.ExtensionContext, private avdService: AVDService) {
+        this.provider = new AVDTreeDataProvider(this.avdService);
 
         const view = vscode.window.createTreeView('android-studio-lite-avd', { treeDataProvider: this.provider, showCollapseAll: true });
 
@@ -68,12 +68,12 @@ export class AVDTreeView {
     };
 
     refresh = async () => {
-        await this.manager.avd.getAVDList(true);
+        await this.avdService.getAVDList(true);
         this.provider.refresh();
     };
 
     async getAVDQuickPickItems(): Promise<AVDQuickPickItem[] | undefined> {
-        return this.manager.avd.getAVDList()
+        return this.avdService.getAVDList()
             .then(avds => {
                 return avds === undefined ? avds : avds.map((avd: AVD) => new AVDQuickPickItem(avd));
             });
@@ -95,7 +95,7 @@ export class AVDTreeView {
         let defaultItem: AVDDeviceQuickPickItem = new AVDDeviceQuickPickItem({
             id: -1, idName: "", name: "Default (No device definition)", oem: "",
         });
-        return this.manager.avd.getAVDDeviceList()
+        return this.avdService.getAVDDeviceList()
             .then(devices => {
                 return devices === undefined ? devices : devices.map((device: AVDDevice) => new AVDDeviceQuickPickItem(device));
             }).then((devices) => {
@@ -109,7 +109,7 @@ export class AVDTreeView {
     async createAVDDiag(path: string, name: string) {
 
         //get new name
-        let avdlist = await this.manager.avd.getAVDList();
+        let avdlist = await this.avdService.getAVDList();
         const newAvdName = await vscode.window.showInputBox({
             title: `Create AVD with ${name}:`,
             placeHolder: "Enter a new AVD name. (Must be unique)",
@@ -145,8 +145,8 @@ export class AVDTreeView {
             return;
         }
 
-        await this.manager.avd.createAVD(newAvdName, path, name, deviceId);
-        await this.manager.avd.getAVDList(true); //reload cache
+        await this.avdService.createAVD(newAvdName, path, name, deviceId);
+        await this.avdService.getAVDList(true); //reload cache
     }
 
     async renameAVDDiag(avdname: string | undefined) {
@@ -158,7 +158,7 @@ export class AVDTreeView {
         }
 
         //get new name
-        let avdlist = await this.manager.avd.getAVDList();
+        let avdlist = await this.avdService.getAVDList();
         const newAvdName = await vscode.window.showInputBox({
             title: `Rename AVD ${target}:`,
             placeHolder: "Enter a new AVD name. (Must be unique)",
@@ -179,8 +179,8 @@ export class AVDTreeView {
             return;
         }
 
-        await this.manager.avd.renameAVD(target, newAvdName);
-        await this.manager.avd.getAVDList(true); //reload cache
+        await this.avdService.renameAVD(target, newAvdName);
+        await this.avdService.getAVDList(true); //reload cache
     }
 
 
@@ -190,16 +190,16 @@ export class AVDTreeView {
         const ans = await showYesNoQuickPick(`Are you sure to delete AVD ${target}?`);
 
         if (ans === "Yes" && target) {
-            await this.manager.avd.deleteAVD(target);
+            await this.avdService.deleteAVD(target);
         }
-        await this.manager.avd.getAVDList(true); //reload cache
+        await this.avdService.getAVDList(true); //reload cache
     }
 
 
     async launchAVDDiag(avdname: string | undefined) {
         let target = avdname ?? await this.askAVDName();
         if (target) {
-            await this.manager.avd.launchEmulator(target);
+            await this.avdService.launchEmulator(target);
         }
     }
 
@@ -208,7 +208,7 @@ export class AVDTreeView {
 
 type TreeItem = AVDTreeItem;
 class AVDTreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
-    constructor(private manager: Manager) { }
+    constructor(private avdService: AVDService) { }
 
 
     getTreeItem(element: TreeItem): vscode.TreeItem {
@@ -218,7 +218,7 @@ class AVDTreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     getChildren(element?: TreeItem): Thenable<TreeItem[]> {
 
 
-        return this.manager.avd.getAVDList().then((avds) => {
+        return this.avdService.getAVDList().then((avds) => {
             let list: AVDTreeItem[] = [];
             if (!avds) {
                 return [];

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { Manager } from '../core';
 import { AVD } from '../cmd/AVDManager';
+import { AVDService } from '../service/AVDService';
 import { generateWebviewHtml } from './webview-html';
 
 export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
@@ -13,7 +13,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly _context: vscode.ExtensionContext,
-        private readonly _manager: Manager
+        private readonly _avdService: AVDService
     ) { }
 
     public setAVDTreeViewProvider(provider: { refresh: () => void }) {
@@ -81,8 +81,8 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
     private async _loadInitialData() {
         console.log('[AVDDropdown] _loadInitialData called');
         try {
-            // Load selected AVD from workspace state
-            const savedAVDName = this._context.workspaceState.get<string>('selectedAVD');
+            // Load selected AVD from AVDService
+            const savedAVDName = this._avdService.getSelectedAVDName();
             console.log('[AVDDropdown] Saved AVD name:', savedAVDName);
 
             // Get AVD list from cache (don't refetch)
@@ -90,7 +90,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
 
             // If there's a saved selection, restore it
             if (savedAVDName) {
-                const avds = await this._manager.avd.getAVDList(); // Use cached data
+                const avds = await this._avdService.getAVDList(); // Use cached data
                 console.log('[AVDDropdown] Found', avds?.length || 0, 'AVDs, looking for:', savedAVDName);
                 if (avds) {
                     const avd = avds.find((a: AVD) => a.name === savedAVDName);
@@ -102,7 +102,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
                 }
             } else {
                 // Select first AVD by default if available
-                const avds = await this._manager.avd.getAVDList(); // Use cached data
+                const avds = await this._avdService.getAVDList(); // Use cached data
                 console.log('[AVDDropdown] No saved AVD, found', avds?.length || 0, 'AVDs');
                 if (avds && avds.length > 0) {
                     console.log('[AVDDropdown] Selecting first AVD:', avds[0].name);
@@ -128,7 +128,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
         try {
             console.log('[AVDDropdown] _sendAVDList: Fetching AVD list from cache...');
             // Use cached AVD list (don't refetch)
-            const avds = await this._manager.avd.getAVDList();
+            const avds = await this._avdService.getAVDList();
             const avdList = avds || [];
             console.log('[AVDDropdown] _sendAVDList: Found', avdList.length, 'AVDs, selected:', this._selectedAVD?.name || 'none');
 
@@ -153,7 +153,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
 
     private async _selectAVD(avdName: string) {
         // Use cached AVD list (don't refetch)
-        const avds = await this._manager.avd.getAVDList();
+        const avds = await this._avdService.getAVDList();
         if (!avds) {
             return;
         }
@@ -161,7 +161,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
         const avd = avds.find((a: AVD) => a.name === avdName);
         if (avd) {
             this._selectedAVD = avd;
-            await this._context.workspaceState.update('selectedAVD', avdName);
+            await this._avdService.setSelectedAVDName(avdName);
             await this._updateSelectedAVD();
         }
     }
@@ -181,7 +181,7 @@ export class AVDDropdownViewProvider implements vscode.WebviewViewProvider {
         console.log('[AVDDropdown] refresh called');
         try {
             // Refresh the AVD list in cache (this will be called by AVDTreeView when it refreshes)
-            await this._manager.avd.getAVDList(true);
+            await this._avdService.getAVDList(true);
             console.log('[AVDDropdown] Cache refreshed, sending to webview');
             // Send updated list to webview
             await this._sendAVDList();

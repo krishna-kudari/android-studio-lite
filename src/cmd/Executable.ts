@@ -1,5 +1,6 @@
 import * as ModuleCmd from "../module/cmd";
-import { Manager } from "../core";
+import { Output } from "../module/output";
+import { Platform, getPlatform } from "../module/platform";
 import * as util from "../module/util";
 
 export interface ICommandPathform {
@@ -27,7 +28,7 @@ export interface ICommandProp {
 
 export abstract class Executable {
     constructor(
-        protected manager: Manager,
+        protected output: Output,
         protected executable: string,
         protected commands: { [key: string]: ICommandProp }
     ) {
@@ -45,7 +46,7 @@ export abstract class Executable {
 
         let cmd = (typeof prop.command === "string") ?
             prop.command :
-            prop.command[this.manager.getPlatform()];
+            prop.command[getPlatform()];
 
         cmd = util.strformatNamed((cmd ?? ""), { "exe": this.executable });
         return util.strformat(cmd, ...params);
@@ -80,11 +81,11 @@ export abstract class Executable {
 
         let showLog = prop.log || false;
         if (showLog) {
-            this.manager.output.show();
-            this.manager.output.appendTime();
-            this.manager.output.append("exec: " + cmd);
+            this.output.show();
+            this.output.appendTime();
+            this.output.append("exec: " + cmd);
             if (cwd) {
-                this.manager.output.append("cwd: " + cwd);
+                this.output.append("cwd: " + cwd);
             }
         }
 
@@ -101,7 +102,7 @@ export abstract class Executable {
             [CommandType.spawn]: ModuleCmd.spawn,
             [CommandType.spawnSync]: ModuleCmd.spawnSync,
         };
-        let next = exec[exectype](this.manager, showLog, cmd, msg, successMsg, failureMsg, cwd);
+        let next = exec[exectype](this.output, showLog, cmd, msg, successMsg, failureMsg, cwd);
         return next.then((out) => (typeof prop.parser === "function") ? prop.parser(out) : out);
     }
 }

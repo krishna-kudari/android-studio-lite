@@ -6,7 +6,6 @@
  */
 export const TYPES = {
     // Core Services
-    Manager: Symbol.for('Manager'),
     ConfigService: Symbol.for('ConfigService'),
     Output: Symbol.for('Output'),
     Cache: Symbol.for('Cache'),
@@ -17,6 +16,13 @@ export const TYPES = {
     BuildVariantService: Symbol.for('BuildVariantService'),
     GradleService: Symbol.for('GradleService'),
     SdkInstallerService: Symbol.for('SdkInstallerService'),
+    LogcatService: Symbol.for('LogcatService'),
+
+    // Command Registry
+    CommandRegistry: Symbol.for('CommandRegistry'),
+
+    // Event System
+    EventBus: Symbol.for('EventBus'),
 
     // VS Code Context
     ExtensionContext: Symbol.for('ExtensionContext'),

@@ -19,15 +19,14 @@ This guide explains how to use the Configuration Service in Android Studio Lite.
 ### 1. Access ConfigService
 
 ```typescript
-import { Manager } from '../core';
-
-// Via Manager (recommended for backward compatibility)
-const manager = Manager.getInstance();
-const config = manager.config;
-
-// Or create directly
 import { ConfigService } from './config';
+
+// Create service instance (or resolve from DI container)
 const config = new ConfigService();
+
+// Or via Dependency Injection
+import { resolve, TYPES } from '../di';
+const config = resolve<ConfigService>(TYPES.ConfigService);
 ```
 
 ### 2. Get Configuration Values
@@ -244,56 +243,41 @@ if (!isValid) {
 
 ---
 
-## Migration Guide
+## Usage Patterns
 
-### From Manager.getConfig()
+### Using ConfigService Directly
 
-**Before:**
-```typescript
-const manager = Manager.getInstance();
-const config = manager.getConfig();
-const sdkPath = config.sdkPath;
-```
-
-**After:**
-```typescript
-const manager = Manager.getInstance();
-const config = manager.config;
-const sdkPath = config.getSdkPath(); // Better: handles env vars
-// OR
-const fullConfig = config.getConfig(); // Same as before
-const sdkPath = fullConfig.sdkPath;
-```
-
-### From Manager.setConfig()
-
-**Before:**
-```typescript
-await manager.setConfig(ConfigItem.sdkPath, '/path/to/sdk', ConfigScope.global);
-```
-
-**After:**
-```typescript
-import { ConfigKeys, ConfigScope } from './config';
-
-await manager.config.set(ConfigKeys.SDK_PATH, '/path/to/sdk', ConfigScope.Global);
-// OR (backward compatible)
-await manager.setConfig(ConfigItem.sdkPath, '/path/to/sdk', ConfigScope.global);
-```
-
-### Direct ConfigService Usage
-
-**New Pattern (Recommended):**
+**Recommended Pattern:**
 ```typescript
 import { ConfigService, ConfigKeys, ConfigScope } from './config';
 
+// Create service instance
 const config = new ConfigService();
 
-// Get values
+// Get values (with environment variable fallback)
 const sdkPath = config.getSdkPath();
 const adbPath = config.getAdbPath();
 
+// Get full configuration object
+const fullConfig = config.getConfig();
+const sdkPathFromConfig = fullConfig.sdkPath;
+
 // Set values
+await config.set(ConfigKeys.SDK_PATH, '/path/to/sdk', ConfigScope.Global);
+```
+
+### Using Dependency Injection
+
+**Recommended for Services:**
+```typescript
+import { resolve, TYPES } from '../di';
+import { ConfigService, ConfigKeys, ConfigScope } from './config';
+
+// Resolve from DI container
+const config = resolve<ConfigService>(TYPES.ConfigService);
+
+// Use same API
+const sdkPath = config.getSdkPath();
 await config.set(ConfigKeys.SDK_PATH, '/path/to/sdk', ConfigScope.Global);
 ```
 

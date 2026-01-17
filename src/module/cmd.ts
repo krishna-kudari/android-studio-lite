@@ -1,9 +1,9 @@
 import * as child_process from "child_process";
 import { showMsg, MsgType } from "./ui";
+import { Output } from "./output";
 import { window, ProgressLocation, Terminal } from 'vscode';
-import { Manager } from "../core";
 
-export const exec = async function (manager: Manager, command: string, willLoad: Function, didLoad: Function, cwd?: string) {
+export const exec = async function (output: Output, command: string, willLoad: Function, didLoad: Function, cwd?: string) {
     willLoad();
 
     const options: child_process.ExecOptions = {};
@@ -38,10 +38,10 @@ export const sendTerm = function (term: Terminal, ...msg: string[]) {
     });
 };
 
-export const spawn = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
+export const spawn = async function (output: Output, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
 
     console.log("CMD Spawn");
-    if (showLog) { manager.output.appendTime(); }
+    if (showLog) { output.appendTime(); }
 
     if (willLoadMsg && willLoadMsg !== "") { showMsg(MsgType.info, willLoadMsg); };
     return new Promise((resolve, reject) => {
@@ -66,7 +66,7 @@ export const spawn = async function (manager: Manager, showLog: boolean, command
                     while (stdout.count() > 1) {
                         let next = stdout.next();
                         if (next) {
-                            manager.output.append(next);
+                            output.append(next);
                         }
                     }
                 }
@@ -84,7 +84,7 @@ export const spawn = async function (manager: Manager, showLog: boolean, command
                     while (stderr.count() > 1) {
                         let next = stderr.next();
                         if (next) {
-                            manager.output.append(next, "error");
+                            output.append(next, "error");
                         }
                     }
                 }
@@ -94,19 +94,19 @@ export const spawn = async function (manager: Manager, showLog: boolean, command
         child.on("error", (code) => {
             console.log("CMD Spawn - fail");
             if (showLog) {
-                manager.output.append(stdout.getBufferAll());
-                manager.output.append(stderr.getBufferAll(), "error");
+                output.append(stdout.getBufferAll());
+                output.append(stderr.getBufferAll(), "error");
             }
             if (failure && failure !== "") { showMsg(MsgType.error, failure + ", Error: " + code); }
             reject(stderr.getAll());
         });
         child.on("close", (code) => {
             if (showLog) {
-                manager.output.append(stdout.getBufferAll());
-                manager.output.append(stderr.getBufferAll(), "error");
+                output.append(stdout.getBufferAll());
+                output.append(stderr.getBufferAll(), "error");
             }
             console.log("CMD Spawn - end: " + code);
-            manager.output.appendTime();
+            output.appendTime();
             if (code && code !== 0) {
                 if (failure && failure !== "") { showMsg(MsgType.error, failure + ", Error: " + code); }
                 reject(stderr.getAll());
@@ -118,10 +118,10 @@ export const spawn = async function (manager: Manager, showLog: boolean, command
     });
 };
 
-export const spawnSync = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
+export const spawnSync = async function (output: Output, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
     const { spawnSync } = require("child_process");
     console.log("CMD SpawnSync");
-    if (showLog) { manager.output.appendTime(); }
+    if (showLog) { output.appendTime(); }
 
     if (willLoadMsg && willLoadMsg !== "") { showMsg(MsgType.info, willLoadMsg); };
     return new Promise((resolve, reject) => {
@@ -135,14 +135,14 @@ export const spawnSync = async function (manager: Manager, showLog: boolean, com
         console.log(result);
 
         if (showLog) {
-            manager.output.appendTime();
+            output.appendTime();
         }
 
         let stdout = result.stdout + "";
         if (result.status && result.status !== 0) {
             let stderr = result.stderr + "";
             if (showLog) {
-                manager.output.append(stderr, "error");
+                output.append(stderr, "error");
             }
 
             console.error(stderr);
@@ -152,35 +152,35 @@ export const spawnSync = async function (manager: Manager, showLog: boolean, com
             return;
         }
 
-        if (showLog) { manager.output.append(stdout); }
+        if (showLog) { output.append(stdout); }
         if (success && success !== "") { showMsg(MsgType.info, success); }
         setTimeout(() => { resolve(stdout); }, success ? 1500 : 0);
     });
 };
 
-export const execWithMsg = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
+export const execWithMsg = async function (output: Output, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
     console.log("CMD MSG");
     return new Promise((resolve, reject) => {
-        exec(manager, command,
+        exec(output, command,
             () => { if (willLoadMsg && willLoadMsg !== "") { showMsg(MsgType.info, willLoadMsg); } },
             (error: any, stdout: string, stderr: string) => {
-                if (showLog) { manager.output.appendTime(); }
+                if (showLog) { output.appendTime(); }
                 if (error) {
-                    if (showLog) { manager.output.append(stderr, "error"); }
+                    if (showLog) { output.append(stderr, "error"); }
                     console.error(stderr);
                     if (failure && failure !== "") { showMsg(MsgType.error, failure + "\n" + stderr); }
                     reject(stderr);
                     return;
                 }
 
-                if (showLog) { manager.output.append(stdout); }
+                if (showLog) { output.append(stdout); }
                 if (success && success !== "") { showMsg(MsgType.info, success); }
                 setTimeout(() => { resolve(stdout); }, success ? 1500 : 0);
             }, cwd);
     });
 };
 
-export const execWithProgress = async function (manager: Manager, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
+export const execWithProgress = async function (output: Output, showLog: boolean, command: string, willLoadMsg?: string, success?: string, failure?: string, cwd?: string) {
     console.log("CMD Progress");
     return window.withProgress(
         { location: ProgressLocation.Notification, },
@@ -194,9 +194,9 @@ export const execWithProgress = async function (manager: Manager, showLog: boole
                     });
                 },
                 didLoad: (error: any, stdout: string, stderr: string) => {
-                    if (showLog) { manager.output.appendTime(); }
+                    if (showLog) { output.appendTime(); }
                     if (error) {
-                        if (showLog) { manager.output.append(stderr, "error"); }
+                        if (showLog) { output.append(stderr, "error"); }
                         console.error(stderr);
                         if (failure && failure !== "") { showMsg(MsgType.error, failure + "\n" + stderr); }
                         reject(stderr);
@@ -204,12 +204,12 @@ export const execWithProgress = async function (manager: Manager, showLog: boole
                     }
 
                     clearInterval(interval);
-                    if (showLog) { manager.output.append(stdout); }
+                    if (showLog) { output.append(stdout); }
                     if (success && success !== "") { progress.report({ message: success, }); }
                     setTimeout(() => { resolve(stdout); }, success ? 1500 : 0);
                 }
             };
-            return exec(manager, command, options.willLoad, options.didLoad, cwd);
+            return exec(output, command, options.willLoad, options.didLoad, cwd);
         })
     );
 };

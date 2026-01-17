@@ -33,13 +33,14 @@ await config.set(ConfigKeys.SDK_PATH, '/path/to/sdk', ConfigScope.Global);
 const fullConfig = config.getConfig();
 ```
 
-### Via Manager (Backward Compatible)
+### Via Dependency Injection
 
 ```typescript
-import { Manager } from '../core';
+import { resolve, TYPES } from '../di';
+import { ConfigService } from './config';
 
-const manager = Manager.getInstance();
-const config = manager.config; // Access ConfigService
+// Resolve from DI container
+const config = resolve<ConfigService>(TYPES.ConfigService);
 
 // Use same API
 const sdkPath = config.getSdkPath();
@@ -53,7 +54,7 @@ await config.set(ConfigKeys.SDK_PATH, '/path/to/sdk', ConfigScope.Global);
 - ✅ **Computed Paths** - Automatic path resolution based on SDK path
 - ✅ **Validation** - Built-in validation for required configuration
 - ✅ **Change Listeners** - React to configuration changes
-- ✅ **Backward Compatible** - Works with existing Manager API
+- ✅ **Dependency Injection** - Integrated with DI container
 
 ## 📚 Documentation
 
@@ -62,12 +63,15 @@ await config.set(ConfigKeys.SDK_PATH, '/path/to/sdk', ConfigScope.Global);
 
 ## 🔗 Integration
 
-The ConfigService is integrated into the Manager singleton:
+The ConfigService is registered in the DI container:
 
 ```typescript
-const manager = Manager.getInstance();
-manager.config.getSdkPath(); // Direct access
-manager.getConfig(); // Backward compatible
+import { resolve, TYPES } from '../di';
+import { ConfigService } from './config';
+
+// Resolve from DI container
+const config = resolve<ConfigService>(TYPES.ConfigService);
+const sdkPath = config.getSdkPath();
 ```
 
 ## 💡 Key Benefits
@@ -77,18 +81,6 @@ manager.getConfig(); // Backward compatible
 3. **Environment Handling** - Automatic fallback to environment variables
 4. **Easy Testing** - Can be mocked easily for unit tests
 5. **Validation** - Built-in validation methods
+6. **Dependency Injection** - Fully integrated with DI container
 
-## 🔄 Migration
-
-Existing code continues to work:
-
-```typescript
-// Old way (still works)
-const config = manager.getConfig();
-const sdkPath = config.sdkPath;
-
-// New way (recommended)
-const sdkPath = manager.config.getSdkPath();
-```
-
-See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed migration examples.
+See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed usage examples.

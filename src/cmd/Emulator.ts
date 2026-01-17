@@ -1,4 +1,4 @@
-import { Manager } from '../core';
+import { Output } from '../module/output';
 import { ICommandProp, Executable, CommandType } from './Executable';
 
 export enum Command {
@@ -21,7 +21,7 @@ let commands: { [key in Command]?: ICommandProp } = {
 };
 
 export class Emulator extends Executable {
-    constructor(manager: Manager) {
-        super(manager, manager.android.getEmulator() ?? "", commands);
+    constructor(output: Output, executable: string) {
+        super(output, executable, commands);
     }
 }
