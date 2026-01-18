@@ -72,23 +72,6 @@ function getWebviewsConfig(mode, env, isProduction) {
                 minifyCSS: true,
             } : false,
         }),
-        new HtmlPlugin({
-            template: path.join(basePath, 'logcat', 'logcat.html'),
-            chunks: ['logcat'],
-            filename: path.join(__dirname, 'dist', 'webviews', 'logcat.html'),
-            inject: true,
-            scriptLoading: 'module',
-            minify: isProduction ? {
-                removeComments: true,
-                collapseWhitespace: true,
-                removeRedundantAttributes: false,
-                useShortDoctype: true,
-                removeEmptyAttributes: true,
-                removeStyleLinkTypeAttributes: true,
-                keepClosingSlash: true,
-                minifyCSS: true,
-            } : false,
-        }),
         new MiniCssExtractPlugin({ filename: '[name].css' }),
     ];
 
@@ -98,7 +81,6 @@ function getWebviewsConfig(mode, env, isProduction) {
         entry: {
             avdSelector: './avdSelector/avdSelector.ts',
             onboarding: './onboarding/onboarding.ts',
-            logcat: './logcat/logcat.ts',
         },
         mode: mode,
         target: 'web',

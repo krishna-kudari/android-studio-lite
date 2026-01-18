@@ -15,7 +15,6 @@ import { BuildVariantService } from './service/BuildVariantService';
 import { GradleService } from './service/GradleService';
 import { LogcatService } from './service/Logcat';
 import { AVDSelectorProvider } from './webviews/apps/avdSelector/avdSelectorProvider';
-import { LogcatWebviewProvider } from './webviews/apps/logcat/logcatProvider';
 import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboardingProvider';
 import { WebviewsController } from './webviews/webviewsController';
 
@@ -99,7 +98,6 @@ function initializeWebviews(
 	controller: WebviewsController;
 	onboardingWebview: any;
 	avdSelectorWebview: any;
-	logcatPanel: any;
 } {
 	const webviewsController = new WebviewsController(context);
 	context.subscriptions.push(webviewsController);
@@ -135,17 +133,7 @@ function initializeWebviews(
 	);
 	context.subscriptions.push(avdSelectorWebview);
 
-	const logcatPanel = webviewsController.registerWebviewView(
-		{
-			id: 'android-studio-lite-logcat',
-			fileName: 'logcat.html',
-			title: 'Logcat',
-		},
-		async (host) => new LogcatWebviewProvider(host),
-	);
-	context.subscriptions.push(logcatPanel);
-
-	return { controller: webviewsController, onboardingWebview, avdSelectorWebview, logcatPanel };
+	return { controller: webviewsController, onboardingWebview, avdSelectorWebview };
 }
 
 function initializeTreeViews(

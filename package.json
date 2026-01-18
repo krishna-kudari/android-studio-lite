@@ -28,13 +28,6 @@
           "title": "Android Studio Lite",
           "icon": "assets/android-studio.svg"
         }
-      ],
-      "panel": [
-        {
-          "id": "android-studio-lite-panel",
-          "title": "Android Studio Lite",
-          "icon": "assets/android-studio.svg"
-        }
       ]
     },
     "views": {
@@ -55,14 +48,6 @@
           "id": "android-studio-lite-avd",
           "name": "Android Virtual Device",
           "contextualTitle": "AVD Manager - Android Virtual Device",
-          "when": "true"
-        }
-      ],
-      "android-studio-lite-panel": [
-        {
-          "id": "android-studio-lite-logcat",
-          "name": "Logcat",
-          "type": "webview",
           "when": "true"
         }
       ]
