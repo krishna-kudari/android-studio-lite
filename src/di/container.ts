@@ -45,6 +45,10 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
     container.registerInstance<Output>(TYPES.Output, output);
     container.registerSingleton<Cache>(TYPES.Cache, Cache);
 
+    // Register EventBus as singleton (needed by services)
+    const eventBus = EventBus.getInstance();
+    container.registerInstance<EventBus>(TYPES.EventBus, eventBus);
+
     // Register Android services
     // AndroidService uses @injectable() decorator, so tsyringe can resolve dependencies automatically
     container.register<AndroidService>(TYPES.AndroidService, {
@@ -66,7 +70,8 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
             const output = dependencyContainer.resolve<Output>(TYPES.Output);
             const androidService = dependencyContainer.resolve<AndroidService>(TYPES.AndroidService);
             const context = dependencyContainer.resolve<vscode.ExtensionContext>(TYPES.ExtensionContext);
-            return new AVDService(cache, configService, output, androidService, context);
+            const eventBus = dependencyContainer.resolve<EventBus>(TYPES.EventBus);
+            return new AVDService(cache, configService, output, androidService, context, eventBus);
         },
     });
 
@@ -76,7 +81,8 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
             const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
             const output = dependencyContainer.resolve<Output>(TYPES.Output);
             const context = dependencyContainer.resolve<vscode.ExtensionContext>(TYPES.ExtensionContext);
-            return new BuildVariantService(cache, configService, output, context);
+            const eventBus = dependencyContainer.resolve<EventBus>(TYPES.EventBus);
+            return new BuildVariantService(cache, configService, output, context, eventBus);
         },
     });
 
@@ -85,7 +91,8 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
             const cache = dependencyContainer.resolve<Cache>(TYPES.Cache);
             const configService = dependencyContainer.resolve<ConfigService>(TYPES.ConfigService);
             const output = dependencyContainer.resolve<Output>(TYPES.Output);
-            return new GradleService(cache, configService, output);
+            const eventBus = dependencyContainer.resolve<EventBus>(TYPES.EventBus);
+            return new GradleService(cache, configService, output, eventBus);
         },
     });
 
@@ -104,16 +111,13 @@ export function setupContainer(context: vscode.ExtensionContext): DependencyCont
             const output = dependencyContainer.resolve<Output>(TYPES.Output);
             const avdService = dependencyContainer.resolve<AVDService>(TYPES.AVDService);
             const buildVariantService = dependencyContainer.resolve<BuildVariantService>(TYPES.BuildVariantService);
-            return new LogcatService(cache, configService, output, avdService, buildVariantService);
+            const eventBus = dependencyContainer.resolve<EventBus>(TYPES.EventBus);
+            return new LogcatService(cache, configService, output, avdService, buildVariantService, eventBus);
         },
     });
 
     // Register Command Registry as singleton
     container.registerSingleton<CommandRegistry>(TYPES.CommandRegistry, CommandRegistry);
-
-    // Register EventBus as singleton
-    const eventBus = EventBus.getInstance();
-    container.registerInstance<EventBus>(TYPES.EventBus, eventBus);
 
     return container;
 }

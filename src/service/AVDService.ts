@@ -1,16 +1,17 @@
-import { injectable, inject } from 'tsyringe';
+import * as nodePath from "node:path";
+import { inject, injectable } from 'tsyringe';
 import type { Disposable, ExtensionContext } from 'vscode';
 import * as vscode from 'vscode';
-import * as nodePath from "node:path";
-import { AVD, AVDDevice, AVDTarget, AVDManager, Command as avdcommand } from '../cmd/AVDManager';
-import { Service } from './Service';
-import { Emulator, Command as EmuCommand } from '../cmd/Emulator';
-import { TYPES } from '../di/types';
-import { Cache } from '../module/cache';
-import { ConfigService } from '../config';
-import { Output } from '../module/output';
 import { ADBExecutable, Command as AdbCommand } from '../cmd/ADB';
-import { parseDevicesOutput, Device } from '../utils/adbParser';
+import { AVD, AVDDevice, AVDManager, AVDTarget, Command as avdcommand } from '../cmd/AVDManager';
+import { Command as EmuCommand, Emulator } from '../cmd/Emulator';
+import { ConfigService } from '../config';
+import { TYPES } from '../di/types';
+import { AVDEventPayload, DeviceEventPayload, EventBus, EventType } from '../events';
+import { Cache } from '../module/cache';
+import { Output } from '../module/output';
+import { Device, parseDevicesOutput } from '../utils/adbParser';
+import { Service } from './Service';
 
 /**
  * Unified model that combines AVD with its running device ID
@@ -41,7 +42,8 @@ export class AVDService extends Service {
         @inject(TYPES.ConfigService) configService: ConfigService,
         @inject(TYPES.Output) output: Output,
         @inject(TYPES.AndroidService) private readonly androidService: import('./AndroidService').AndroidService,
-        @inject(TYPES.ExtensionContext) private readonly context: ExtensionContext
+        @inject(TYPES.ExtensionContext) private readonly context: ExtensionContext,
+        @inject(TYPES.EventBus) private readonly eventBus: EventBus
     ) {
         super(cache, configService, output);
 
@@ -94,7 +96,12 @@ export class AVDService extends Service {
         if (device >= 0) {
             extra += ` --device "${device}" `;
         }
-        return this.avdmanager.exec<AVD>(avdcommand.create, avdname, path, imgname, extra);
+        const result = await this.avdmanager.exec<AVD>(avdcommand.create, avdname, path, imgname, extra);
+
+        // Emit event when AVD is created
+        this.eventBus.emit(EventType.AVDCreated, { avdName: avdname, avdPath: avdHome ? nodePath.join(avdHome, avdname + ".avd") : undefined } as AVDEventPayload);
+
+        return result;
     }
 
     async renameAVD(name: string, newName: string) {
@@ -102,13 +109,23 @@ export class AVDService extends Service {
     }
 
     async deleteAVD(name: string) {
-        return this.avdmanager.exec<AVD>(avdcommand.delete, name);
+        const result = await this.avdmanager.exec<AVD>(avdcommand.delete, name);
+
+        // Emit event when AVD is deleted
+        this.eventBus.emit(EventType.AVDDeleted, { avdName: name } as AVDEventPayload);
+
+        return result;
     }
 
     async launchEmulator(name: string, opt?: string) {
         const config = this.getConfig();
         opt = (opt ?? "") + " " + (config.emulatorOpt ?? "");
-        return this.emulator.exec<string>(EmuCommand.run, name, opt);
+        const result = await this.emulator.exec<string>(EmuCommand.run, name, opt);
+
+        // Emit event when AVD starts
+        this.eventBus.emit(EventType.AVDStarted, { avdName: name } as AVDEventPayload);
+
+        return result;
     }
 
     startDevicePolling(intervalMs: number = 30 * 1000): void {
@@ -140,7 +157,37 @@ export class AVDService extends Service {
         }
 
         // Fetch devices from ADB (returns Device[] directly)
+        const previousDeviceIds = new Set(this.devices.map(d => d.id));
         const devices = await this.fetchDevicesFromAdb();
+        const currentDeviceIds = new Set(devices.map(d => d.id));
+
+        // Detect newly connected devices
+        for (const device of devices) {
+            if (device.status === 'device' && !previousDeviceIds.has(device.id)) {
+                this.eventBus.emit(EventType.DeviceConnected, {
+                    deviceId: device.id,
+                    deviceName: device.id
+                } as DeviceEventPayload);
+            }
+        }
+
+        // Detect disconnected devices
+        for (const device of this.devices) {
+            if (device.status === 'device' && !currentDeviceIds.has(device.id)) {
+                this.eventBus.emit(EventType.DeviceDisconnected, {
+                    deviceId: device.id,
+                    deviceName: device.id
+                } as DeviceEventPayload);
+
+                // If disconnected device is an emulator, also emit AVDStopped
+                if (device.type === 'emulator') {
+                    const avdName = await this.getDeviceAVDName(device.id);
+                    if (avdName) {
+                        this.eventBus.emit(EventType.AVDStopped, { avdName } as AVDEventPayload);
+                    }
+                }
+            }
+        }
 
         this.devices = devices;
         this.setCache(AVDService.DEVICE_LIST_CACHE_KEY, devices, AVDService.DEVICE_LIST_TTL_SECONDS);
@@ -254,6 +301,9 @@ export class AVDService extends Service {
         }
         // For physical devices, we don't set selectedAVD (it's AVD-specific)
 
+        // Emit device selected event
+        this.eventBus.emit(EventType.DeviceSelected, { deviceId, deviceName: deviceId } as DeviceEventPayload);
+
         this.notifyDeviceStateChanged();
     }
 
@@ -289,6 +339,10 @@ export class AVDService extends Service {
                 };
 
         await this.saveSelectedAVD();
+
+        // Emit AVD selected event
+        this.eventBus.emit(EventType.AVDSelected, { avdName: this.selectedAVD.name } as AVDEventPayload);
+
         this.notifyDeviceStateChanged();
     }
 

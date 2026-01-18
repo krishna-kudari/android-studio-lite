@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { BuildVariantService } from '../service/BuildVariantService';
 import { subscribe } from '../module';
 import { BuildVariantTreeDataProvider } from './BuildVariantTreeDataProvider';
+import { EventBus, EventType } from '../events';
+import { resolve, TYPES } from '../di';
 
 export class BuildVariantTreeView {
     readonly provider: BuildVariantTreeDataProvider;
@@ -26,6 +28,24 @@ export class BuildVariantTreeView {
         }
 
         subscribe(context, subscriptions);
+
+        // Subscribe to EventBus events for auto-refresh
+        this.setupEventSubscriptions(context);
+    }
+
+    private setupEventSubscriptions(context: vscode.ExtensionContext): void {
+        try {
+            const eventBus = resolve<EventBus>(TYPES.EventBus);
+
+            // Subscribe to build variant change events for auto-refresh
+            context.subscriptions.push(
+                eventBus.subscribe(EventType.BuildVariantChanged, () => {
+                    this.provider.refresh();
+                })
+            );
+        } catch (error) {
+            console.error('[BuildVariantTreeView] Failed to setup EventBus subscriptions:', error);
+        }
     }
 
     private setupFileWatcher(context: vscode.ExtensionContext) {

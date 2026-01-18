@@ -9,6 +9,7 @@ import { TYPES } from '../di/types';
 import { Cache } from '../module/cache';
 import { ConfigService } from '../config';
 import { Output } from '../module/output';
+import { EventBus, EventType, BuildEventPayload } from '../events';
 
 @injectable()
 export class GradleService extends Service {
@@ -19,7 +20,8 @@ export class GradleService extends Service {
     constructor(
         @inject(TYPES.Cache) cache: Cache,
         @inject(TYPES.ConfigService) configService: ConfigService,
-        @inject(TYPES.Output) output: Output
+        @inject(TYPES.Output) output: Output,
+        @inject(TYPES.EventBus) private readonly eventBus: EventBus
     ) {
         super(cache, configService, output);
         this.gradle = new GradleExecutable(output);
@@ -52,6 +54,9 @@ export class GradleService extends Service {
                 reject(new Error("Build was cancelled"));
                 return;
             }
+
+            // Emit build started event
+            this.eventBus.emit(EventType.BuildStarted, { variant: variantTask } as BuildEventPayload);
 
             const spawnOptions: child_process.SpawnOptions = {
                 shell: true,
@@ -103,6 +108,8 @@ export class GradleService extends Service {
                 this.buildProcess = null;
                 this.output.append(stderr, "error");
                 showMsg(MsgType.error, `Failed to install ${variantTask}: ${error.message}`);
+                // Emit build failed event
+                this.eventBus.emit(EventType.BuildFailed, { variant: variantTask, error } as BuildEventPayload);
                 reject(error);
             });
 
@@ -110,12 +117,16 @@ export class GradleService extends Service {
                 this.buildProcess = null;
                 if (code === 0) {
                     showMsg(MsgType.info, `${variantTask} installed successfully.`);
+                    // Emit build completed event
+                    this.eventBus.emit(EventType.BuildCompleted, { variant: variantTask, success: true } as BuildEventPayload);
                     resolve();
                 } else {
                     this.output.append(stderr, "error");
                     const errorMsg = stderr || stdout || `Gradle build failed with exit code ${code}`;
                     console.error(`[GradleService] Build failed. Exit code: ${code}, stderr: ${stderr}, stdout: ${stdout}`);
                     showMsg(MsgType.error, `Failed to install ${variantTask}. Exit code: ${code}`);
+                    // Emit build failed event
+                    this.eventBus.emit(EventType.BuildFailed, { variant: variantTask, error: new Error(errorMsg) } as BuildEventPayload);
                     reject(new Error(errorMsg));
                 }
             });
@@ -148,6 +159,9 @@ export class GradleService extends Service {
                 reject(new Error("Build was cancelled"));
                 return;
             }
+
+            // Emit build started event
+            this.eventBus.emit(EventType.BuildStarted, { variant: variantTask } as BuildEventPayload);
 
             const spawnOptions: child_process.SpawnOptions = {
                 shell: true,
@@ -199,6 +213,8 @@ export class GradleService extends Service {
                 this.buildProcess = null;
                 this.output.append(stderr, "error");
                 showMsg(MsgType.error, `Failed to assemble ${variantTask}: ${error.message}`);
+                // Emit build failed event
+                this.eventBus.emit(EventType.BuildFailed, { variant: variantTask, error } as BuildEventPayload);
                 reject(error);
             });
 
@@ -206,11 +222,16 @@ export class GradleService extends Service {
                 this.buildProcess = null;
                 if (code === 0) {
                     showMsg(MsgType.info, `${variantTask} assembled successfully.`);
+                    // Emit build completed event
+                    this.eventBus.emit(EventType.BuildCompleted, { variant: variantTask, success: true } as BuildEventPayload);
                     resolve();
                 } else {
                     this.output.append(stderr, "error");
                     showMsg(MsgType.error, `Failed to assemble ${variantTask}. Exit code: ${code}`);
-                    reject(new Error(`Gradle build failed with exit code ${code}`));
+                    const errorMsg = `Gradle build failed with exit code ${code}`;
+                    // Emit build failed event
+                    this.eventBus.emit(EventType.BuildFailed, { variant: variantTask, error: new Error(errorMsg) } as BuildEventPayload);
+                    reject(new Error(errorMsg));
                 }
             });
         });

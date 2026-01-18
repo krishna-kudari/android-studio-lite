@@ -126,11 +126,6 @@ export class SelectBuildVariantCommand extends Command {
     }
 
     private async saveSelectedBuildVariant(moduleName: string, variantName: string) {
-        const selectedVariants = this.treeDataProvider.context.workspaceState.get<Record<string, string>>(
-            this.buildVariantService.STORAGE_KEY_MODULE_VARIANT,
-            {}
-        );
-        selectedVariants[moduleName] = variantName;
-        await this.treeDataProvider.context.workspaceState.update(this.buildVariantService.STORAGE_KEY_MODULE_VARIANT, selectedVariants);
+        await this.buildVariantService.setSelectedVariant(moduleName, variantName);
     }
 }

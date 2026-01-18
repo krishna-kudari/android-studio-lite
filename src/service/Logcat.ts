@@ -10,6 +10,7 @@ import { AVDService } from "./AVDService";
 import { BuildVariantService } from "./BuildVariantService";
 import { ADBExecutable, Command } from "../cmd/ADB";
 import { Device } from "../utils/adbParser";
+import { EventBus, EventType, LogcatEventPayload } from "../events";
 
 @injectable()
 export class LogcatService extends Service {
@@ -23,7 +24,8 @@ export class LogcatService extends Service {
         @inject(TYPES.ConfigService) configService: ConfigService,
         @inject(TYPES.Output) output: Output,
         @inject(TYPES.AVDService) private readonly avdService: AVDService,
-        @inject(TYPES.BuildVariantService) private readonly buildVariantService: BuildVariantService
+        @inject(TYPES.BuildVariantService) private readonly buildVariantService: BuildVariantService,
+        @inject(TYPES.EventBus) private readonly eventBus: EventBus
     ) {
         super(cache, configService, output);
         this.outputChannel = vscode.window.createOutputChannel('Logcat');
@@ -187,6 +189,10 @@ export class LogcatService extends Service {
             if (!this.webviewMessageCallback) {
                 this.outputChannel.show(true);
             }
+
+            // Emit logcat started event
+            this.eventBus.emit(EventType.LogcatStarted, { deviceId: deviceId } as LogcatEventPayload);
+
             vscode.window.showInformationMessage('Logcat started');
         } catch (error: any) {
             console.error('[Logcat] Error starting logcat:', error);
@@ -201,9 +207,17 @@ export class LogcatService extends Service {
      */
     stop(): void {
         if (!this.logcatProcess) return;
+
+        // Get device ID before stopping (if available)
+        const selectedDevice = this.avdService.getSelectedDevice();
+        const deviceId = selectedDevice?.id;
+
         this.logcatProcess.kill();
         this.logcatProcess = null;
         this.output.show();
+
+        // Emit logcat stopped event
+        this.eventBus.emit(EventType.LogcatStopped, { deviceId } as LogcatEventPayload);
     }
 
     /**
@@ -215,6 +229,11 @@ export class LogcatService extends Service {
         if (this.webviewMessageCallback) {
             this.webviewMessageCallback('clear');
         }
+
+        // Emit logcat cleared event
+        const selectedDevice = this.avdService.getSelectedDevice();
+        const deviceId = selectedDevice?.id;
+        this.eventBus.emit(EventType.LogcatCleared, { deviceId } as LogcatEventPayload);
     }
 
     /**
@@ -227,7 +246,10 @@ export class LogcatService extends Service {
     /**
      * Set log level (placeholder for future filtering)
      */
-    setLogLevel(_level: string): void {
-        // No-op for now
+    setLogLevel(level: string): void {
+        // Emit logcat level changed event
+        const selectedDevice = this.avdService.getSelectedDevice();
+        const deviceId = selectedDevice?.id;
+        this.eventBus.emit(EventType.LogcatLevelChanged, { level, deviceId } as LogcatEventPayload);
     }
 }

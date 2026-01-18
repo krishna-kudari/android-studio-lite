@@ -1,14 +1,15 @@
 import type { Disposable, ExtensionContext } from 'vscode';
-import { Disposable as VSCodeDisposable, window, commands, ProgressLocation, CancellationTokenSource } from 'vscode';
-import type { WebviewProvider, WebviewHost } from '@webviews/webviewProvider';
-import type { WebviewState } from '@webviews/protocol';
-import type { AVD } from '@src/cmd/AVDManager';
-import type { MuduleBuildVariant } from '@src/service/BuildVariantService';
-import { AVDService } from '@src/service/AVDService';
-import { BuildVariantService } from '@src/service/BuildVariantService';
-import { GradleService } from '@src/service/GradleService';
-import { Output } from '@src/module/output';
-import { ConfigService } from '@src/config';
+import { CancellationTokenSource, commands, ProgressLocation, window } from 'vscode';
+import type { AVD } from '../../../cmd/AVDManager';
+import { ConfigService } from '../../../config';
+import { AVDEventPayload, BuildEventPayload, DeviceEventPayload, EventBus, EventType, LogcatEventPayload } from '../../../events';
+import { Output } from '../../../module/output';
+import { AVDService } from '../../../service/AVDService';
+import type { MuduleBuildVariant } from '../../../service/BuildVariantService';
+import { BuildVariantService } from '../../../service/BuildVariantService';
+import { GradleService } from '../../../service/GradleService';
+import type { WebviewState } from '../../protocol';
+import type { WebviewHost, WebviewProvider } from '../../webviewProvider';
 
 export interface AVDSelectorWebviewState extends WebviewState {
     avds?: AVD[];
@@ -24,6 +25,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     private readonly gradleService: GradleService;
     private readonly output: Output;
     private readonly configService: ConfigService;
+    private readonly eventBus: EventBus;
     private buildCancellationTokens = new Map<string, CancellationTokenSource>();
     private logcatActive: boolean = false;
 
@@ -34,13 +36,93 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         buildVariantService: BuildVariantService,
         gradleService: GradleService,
         output: Output,
-        configService: ConfigService
+        configService: ConfigService,
+        eventBus: EventBus
     ) {
         this.avdService = avdService;
         this.buildVariantService = buildVariantService;
         this.gradleService = gradleService;
         this.output = output;
         this.configService = configService;
+        this.eventBus = eventBus;
+
+        // Subscribe to EventBus events
+        this.setupEventSubscriptions();
+    }
+
+    private setupEventSubscriptions(): void {
+        // Subscribe to AVD events
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.AVDSelected, async (payload: AVDEventPayload) => {
+                await this.host.notify('avd-selected', payload);
+                await this.sendAVDList(); // Refresh list
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.AVDCreated, async () => {
+                await this.sendAVDList(); // Refresh list
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.AVDDeleted, async () => {
+                await this.sendAVDList(); // Refresh list
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.AVDStarted, async (payload: AVDEventPayload) => {
+                await this.sendAVDList(); // Refresh to show running status
+            })
+        );
+
+        // Subscribe to device events
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.DeviceConnected, async (payload: DeviceEventPayload) => {
+                await this.sendAVDList(); // Refresh device status
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.DeviceDisconnected, async (payload: DeviceEventPayload) => {
+                await this.sendAVDList(); // Refresh device status
+            })
+        );
+
+        // Subscribe to build events
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.BuildStarted, async (payload: BuildEventPayload) => {
+                await this.host.notify('build-started', payload);
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.BuildCompleted, async (payload: BuildEventPayload) => {
+                await this.host.notify('build-completed', payload);
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.BuildFailed, async (payload: BuildEventPayload) => {
+                await this.host.notify('build-failed', payload);
+            })
+        );
+
+        // Subscribe to logcat events
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.LogcatStarted, async (payload: LogcatEventPayload) => {
+                this.logcatActive = true;
+                await this.host.notify('logcat-state-changed', { active: true });
+            })
+        );
+
+        this.disposables.push(
+            this.eventBus.subscribe(EventType.LogcatStopped, async (payload: LogcatEventPayload) => {
+                this.logcatActive = false;
+                await this.host.notify('logcat-state-changed', { active: false });
+            })
+        );
     }
 
     getTelemetryContext(): Record<string, string | number | boolean | undefined> {

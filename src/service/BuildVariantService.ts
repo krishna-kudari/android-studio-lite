@@ -13,6 +13,7 @@ import { ConfigService } from '../config';
 import { Output } from '../module/output';
 import { GradleExecutable } from '../cmd/Gradle';
 import type { Disposable } from 'vscode';
+import { EventBus, EventType, BuildEventPayload } from '../events';
 
 
 export interface MuduleBuildVariant extends Module {
@@ -57,7 +58,8 @@ export class BuildVariantService extends Service {
         @inject(TYPES.Cache) cache: Cache,
         @inject(TYPES.ConfigService) configService: ConfigService,
         @inject(TYPES.Output) output: Output,
-        @inject(TYPES.ExtensionContext) private readonly context: vscode.ExtensionContext
+        @inject(TYPES.ExtensionContext) private readonly context: vscode.ExtensionContext,
+        @inject(TYPES.EventBus) private readonly eventBus: EventBus
     ) {
         super(cache, configService, output);
         this.gradle = new GradleExecutable(output);
@@ -79,6 +81,9 @@ export class BuildVariantService extends Service {
         this.selectedModule = moduleName;
         await this.context.workspaceState.update(this.STORAGE_KEY_MODULE, moduleName);
         this.notifyModuleSelectionChanged();
+
+        // Note: BuildVariantChanged event should be emitted when variant is actually set
+        // This happens in tree views/commands that update STORAGE_KEY_MODULE_VARIANT
     }
 
     /**
@@ -116,6 +121,21 @@ export class BuildVariantService extends Service {
             console.error('[BuildVariantService] Error getting applicationId:', error);
             return null;
         }
+    }
+
+    /**
+     * Set selected build variant for a module and emit BuildVariantChanged event
+     */
+    async setSelectedVariant(moduleName: string, variantName: string): Promise<void> {
+        const selectedVariants = this.context.workspaceState.get<Record<string, string>>(
+            this.STORAGE_KEY_MODULE_VARIANT,
+            {}
+        );
+        selectedVariants[moduleName] = variantName;
+        await this.context.workspaceState.update(this.STORAGE_KEY_MODULE_VARIANT, selectedVariants);
+
+        // Emit event when variant changes
+        this.eventBus.emit(EventType.BuildVariantChanged, { variant: variantName, module: moduleName } as BuildEventPayload);
     }
 
     /**

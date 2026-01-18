@@ -1,22 +1,23 @@
 import 'reflect-metadata'; // Required for tsyringe decorators
-import * as vscode from 'vscode';
 import { DependencyContainer } from 'tsyringe';
+import * as vscode from 'vscode';
 import { AVDTreeView } from './avd/AVDTreeView';
 import { BuildVariantTreeView } from './buildVariant/BuildVariantTreeView';
-import { WebviewsController } from './webviews/webviewsController';
-import { AVDSelectorProvider } from './webviews/apps/avdSelector/avdSelectorProvider';
-import { setupContainer, resolve, TYPES } from './di';
-import { ExtensionConfig } from './onboarding/extensionConfig';
-import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboardingProvider';
-import { LogcatWebviewProvider } from './webviews/apps/logcat/logcatProvider';
 import { CommandRegistry } from './commands/CommandRegistry';
-import { LogcatService } from './service/Logcat';
+import { ConfigService } from './config';
+import { resolve, setupContainer, TYPES } from './di';
+import { EventBus } from './events/EventBus';
+import { Output } from './module/output';
+import { ExtensionConfig } from './onboarding/extensionConfig';
 import { AndroidService } from './service/AndroidService';
 import { AVDService } from './service/AVDService';
-import { ConfigService } from './config';
 import { BuildVariantService } from './service/BuildVariantService';
 import { GradleService } from './service/GradleService';
-import { Output } from './module/output';
+import { LogcatService } from './service/Logcat';
+import { AVDSelectorProvider } from './webviews/apps/avdSelector/avdSelectorProvider';
+import { LogcatWebviewProvider } from './webviews/apps/logcat/logcatProvider';
+import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboardingProvider';
+import { WebviewsController } from './webviews/webviewsController';
 
 interface ResolvedServices {
 	configService: ConfigService;
@@ -26,6 +27,7 @@ interface ResolvedServices {
 	gradleService: GradleService;
 	output: Output;
 	logcatService: LogcatService;
+	eventBus: EventBus;
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -66,6 +68,7 @@ function resolveServices(container: DependencyContainer): ResolvedServices {
 		gradleService: container.resolve<GradleService>(TYPES.GradleService),
 		output: container.resolve<Output>(TYPES.Output),
 		logcatService: resolve<LogcatService>(TYPES.LogcatService),
+		eventBus: resolve<EventBus>(TYPES.EventBus),
 	};
 }
 
@@ -127,6 +130,7 @@ function initializeWebviews(
 				services.gradleService,
 				services.output,
 				services.configService,
+				services.eventBus,
 			),
 	);
 	context.subscriptions.push(avdSelectorWebview);
