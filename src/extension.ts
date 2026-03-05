@@ -192,6 +192,7 @@ function initializeWebviews(
 			id: 'android-studio-lite-avd-dropdown',
 			fileName: 'avdSelector.html',
 			title: 'Android Studio Lite',
+			webviewHostOptions: { retainContextWhenHidden: true },
 		},
 		async (host) =>
 			new AVDSelectorProvider(
