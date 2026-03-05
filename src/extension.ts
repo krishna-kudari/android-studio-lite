@@ -34,11 +34,16 @@ interface ResolvedServices {
 
 const ANDROID_PROJECT_CONTEXT_KEY = 'androidStudioLite.isAndroidProject';
 
-function updateAndroidProjectContext(workspaceRoot: string | undefined): boolean {
-	const isAndroid = workspaceRoot
-		? fs.existsSync(path.join(workspaceRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'))
-		: false;
+function isAndroidProjectRoot(workspaceRoot: string): boolean {
+	const gradlew = path.join(workspaceRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+	if (fs.existsSync(gradlew)) return true;
+	if (fs.existsSync(path.join(workspaceRoot, 'settings.gradle'))) return true;
+	if (fs.existsSync(path.join(workspaceRoot, 'settings.gradle.kts'))) return true;
+	return false;
+}
 
+function updateAndroidProjectContext(workspaceRoot: string | undefined): boolean {
+	const isAndroid = workspaceRoot ? isAndroidProjectRoot(workspaceRoot) : false;
 	vscode.commands.executeCommand('setContext', ANDROID_PROJECT_CONTEXT_KEY, isAndroid);
 	return isAndroid;
 }
@@ -78,6 +83,52 @@ function registerStubViewProviders(context: vscode.ExtensionContext): void {
 			showCollapseAll: true,
 		}),
 	);
+
+	registerStubCommands(context);
+}
+
+/** Command IDs contributed in package.json - register stubs when not an Android project so they never "not found". */
+const CONTRIBUTED_COMMAND_IDS = [
+	'android-studio-lite.showOnboarding',
+	'android-studio-lite.runApp',
+	'android-studio-lite.stopApp',
+	'android-studio-lite.clearData',
+	'android-studio-lite.uninstallApp',
+	'android-studio-lite.startLogcat',
+	'android-studio-lite.stopLogcat',
+	'android-studio-lite.pauseLogcat',
+	'android-studio-lite.resumeLogcat',
+	'android-studio-lite.clearLogcat',
+	'android-studio-lite.setLogLevel',
+	'android-studio-lite.startEmulator',
+	'android-studio-lite.selectEmulator',
+	'android-studio-lite.bootEmulator',
+	'android-studio-lite.avdlist-refresh',
+	'android-studio-lite.avd-create',
+	'android-studio-lite.avd-launch',
+	'android-studio-lite.avd-edit',
+	'android-studio-lite.avd-showdir',
+	'android-studio-lite.avd-showconfigfile',
+	'android-studio-lite.avd-delete',
+	'android-studio-lite.setup-wizard',
+	'android-studio-lite.setup-sdkpath',
+	'android-studio-lite.setup-avdmanager',
+	'android-studio-lite.setup-emulator',
+	'android-studio-lite.avd-select',
+	'android-studio-lite.buildvariant-select',
+	'android-studio-lite.buildvariant-refresh',
+] as const;
+
+const NO_PROJECT_MESSAGE = 'Open the root folder of an Android project (containing gradlew or settings.gradle) to use Android Studio Lite.';
+
+function registerStubCommands(context: vscode.ExtensionContext): void {
+	for (const id of CONTRIBUTED_COMMAND_IDS) {
+		context.subscriptions.push(
+			vscode.commands.registerCommand(id, () => {
+				void vscode.window.showInformationMessage(NO_PROJECT_MESSAGE);
+			}),
+		);
+	}
 }
 
 export async function activate(context: vscode.ExtensionContext) {

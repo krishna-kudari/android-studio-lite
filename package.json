@@ -2,7 +2,7 @@
   "name": "android-studio-lite",
   "displayName": "Android Studio Lite",
   "description": "Android Dev Companion for Cursor/VS Code - Device management and app lifecycle controls",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "krishna-kudari",
   "repository": {
     "type": "git",
@@ -56,17 +56,17 @@
     "viewsWelcome": [
       {
         "view": "android-studio-lite-avd-dropdown",
-        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew`).",
+        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew` or `settings.gradle`).",
         "when": "androidStudioLite.isAndroidProject == false"
       },
       {
         "view": "android-studio-lite-build-variant",
-        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew`).",
+        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew` or `settings.gradle`).",
         "when": "androidStudioLite.isAndroidProject == false"
       },
       {
         "view": "android-studio-lite-avd",
-        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew`).",
+        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew` or `settings.gradle`).",
         "when": "androidStudioLite.isAndroidProject == false"
       }
     ],

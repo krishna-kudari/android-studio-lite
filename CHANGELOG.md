@@ -2,6 +2,15 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.5] - 2025-03-05
+
+### Fixed
+- "Command not found" when clicking Refresh in Build Variant or AVD view without an Android project: all contributed commands now have stub handlers that show a helpful message instead of error
+- Android project detection improved: folder is now recognized if it contains `gradlew`, `settings.gradle`, or `settings.gradle.kts` (not only gradlew)
+
+### Changed
+- Welcome view copy updated to mention `settings.gradle` as well as `gradlew`
+
 ## [0.0.4] - 2025-03-05
 
 ### Added
