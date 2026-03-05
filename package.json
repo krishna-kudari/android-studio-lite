@@ -2,7 +2,7 @@
   "name": "android-studio-lite",
   "displayName": "Android Studio Lite",
   "description": "Android Dev Companion for Cursor/VS Code - Device management and app lifecycle controls",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "krishna-kudari",
   "repository": {
     "type": "git",
@@ -432,6 +432,7 @@
     "watch:extension": "tsc -watch -p ./",
     "watch:webviews": "webpack --mode development --watch",
     "build": "npm run compile",
+    "package": "npm run compile && vsce package",
     "build:quick": "webpack --mode production --env quick=true",
     "test": "npm run test:unit && npm run test:extension",
     "test:unit": "jest",
@@ -448,6 +449,7 @@
     "tsyringe": "^4.10.0"
   },
   "devDependencies": {
+    "@vscode/vsce": "^2.22.0",
     "@types/jest": "^29.5.12",
     "@types/mocha": "^10.0.6",
     "@types/node": "16.x",

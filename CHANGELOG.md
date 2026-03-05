@@ -2,6 +2,19 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.4] - 2025-03-05
+
+### Added
+- Kotlin import folding: `editor.foldingImportsByDefault` now works for `.kt` files via a custom `FoldingRangeProvider` (fwcd kotlin-language-server does not return `FoldingRangeKind.Imports`)
+- Activation on Kotlin files (`onLanguage:kotlin`) so the folding provider is available when opening `.kt` files
+
+### Fixed
+- Module config (Gradle `loadModuleConfig`) no longer fetched twice when opening the activity bar: concurrent calls now share a single in-flight request in `BuildVariantService`
+- Module config no longer reloads when switching between activity bar items (e.g. File Explorer, Git, back to Android Studio Lite): AVD selector webview now uses `retainContextWhenHidden: true` so the webview is not re-created when the view is hidden
+
+### Changed
+- Build variant module list load is coalesced so multiple consumers (AVD dropdown bootstrap, refresh-modules, Build Variant tree) trigger only one Gradle run
+
 ## [0.0.3] - 2025-01-12
 
 ### Added
