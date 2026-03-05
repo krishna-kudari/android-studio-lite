@@ -19,6 +19,7 @@ import { LogcatService } from './service/Logcat';
 import { AVDSelectorProvider } from './webviews/apps/avdSelector/avdSelectorProvider';
 import { OnboardingWebviewProvider } from './webviews/apps/onboarding/onboardingProvider';
 import { WebviewsController } from './webviews/webviewsController';
+import { KotlinImportFoldingProvider } from './language/KotlinImportFoldingProvider';
 
 interface ResolvedServices {
 	configService: ConfigService;
@@ -81,6 +82,14 @@ function registerStubViewProviders(context: vscode.ExtensionContext): void {
 
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
+
+	// Kotlin import folding: fwcd/kotlin-language-server doesn't return FoldingRangeKind.Imports
+	context.subscriptions.push(
+		vscode.languages.registerFoldingRangeProvider(
+			{ language: 'kotlin' },
+			new KotlinImportFoldingProvider(),
+		),
+	);
 
 	const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	const isAndroid = updateAndroidProjectContext(workspaceRoot);

@@ -17,6 +17,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onLanguage:kotlin",
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
