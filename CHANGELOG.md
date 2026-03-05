@@ -2,6 +2,11 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.6] - 2025-03-05
+
+### Changed
+- Added Open VSX publish support: `ovsx` devDependency and scripts `publish:marketplace`, `publish:ovsx`, `publish` (both) for keeping Marketplace and Open VSX in sync
+
 ## [0.0.5] - 2025-03-05
 
 ### Fixed
