@@ -1,4 +1,6 @@
 import 'reflect-metadata'; // Required for tsyringe decorators
+import * as fs from 'fs';
+import * as path from 'path';
 import { DependencyContainer } from 'tsyringe';
 import * as vscode from 'vscode';
 import { AVDTreeView } from './avd/AVDTreeView';
@@ -29,8 +31,71 @@ interface ResolvedServices {
 	eventBus: EventBus;
 }
 
+const ANDROID_PROJECT_CONTEXT_KEY = 'androidStudioLite.isAndroidProject';
+
+function updateAndroidProjectContext(workspaceRoot: string | undefined): boolean {
+	const isAndroid = workspaceRoot
+		? fs.existsSync(path.join(workspaceRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'))
+		: false;
+
+	vscode.commands.executeCommand('setContext', ANDROID_PROJECT_CONTEXT_KEY, isAndroid);
+	return isAndroid;
+}
+
+function registerStubViewProviders(context: vscode.ExtensionContext): void {
+	const emptyTreeProvider: vscode.TreeDataProvider<unknown> = {
+		getChildren: () => [],
+		getTreeItem: () => new vscode.TreeItem(''),
+	};
+
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			'android-studio-lite-avd-dropdown',
+			{
+				resolveWebviewView(
+					webviewView: vscode.WebviewView,
+					_resolveContext: vscode.WebviewViewResolveContext,
+					_token: vscode.CancellationToken,
+				) {
+					webviewView.webview.options = { enableScripts: true, enableCommandUris: true };
+					webviewView.webview.html = '<!DOCTYPE html><html><body></body></html>';
+				},
+			},
+		),
+	);
+
+	context.subscriptions.push(
+		vscode.window.createTreeView('android-studio-lite-build-variant', {
+			treeDataProvider: emptyTreeProvider,
+			showCollapseAll: true,
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.window.createTreeView('android-studio-lite-avd', {
+			treeDataProvider: emptyTreeProvider,
+			showCollapseAll: true,
+		}),
+	);
+}
+
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
+
+	const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+	const isAndroid = updateAndroidProjectContext(workspaceRoot);
+
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeWorkspaceFolders(() => {
+			const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+			updateAndroidProjectContext(root);
+		}),
+	);
+
+	if (!isAndroid) {
+		registerStubViewProviders(context);
+		return;
+	}
 
 	// Initialize dependency injection and resolve services
 	const container = initializeDependencyInjection(context);

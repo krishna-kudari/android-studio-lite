@@ -52,6 +52,23 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "android-studio-lite-avd-dropdown",
+        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew`).",
+        "when": "androidStudioLite.isAndroidProject == false"
+      },
+      {
+        "view": "android-studio-lite-build-variant",
+        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew`).",
+        "when": "androidStudioLite.isAndroidProject == false"
+      },
+      {
+        "view": "android-studio-lite-avd",
+        "contents": "No Android project open.\n\n[Open Android Project](command:vscode.openFolder)\n\nMake sure you open the **root** folder of your Android project (the one containing `gradlew`).",
+        "when": "androidStudioLite.isAndroidProject == false"
+      }
+    ],
     "commands": [
       {
         "command": "android-studio-lite.showOnboarding",
