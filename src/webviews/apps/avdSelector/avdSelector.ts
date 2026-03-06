@@ -94,6 +94,27 @@ export class ASlAVDSelectorApp extends ASlElement {
 			.button-group asl-toggle-button {
 				flex: 0 0 auto;
 			}
+
+			.open-project-placeholder {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 1rem;
+				padding: 1.5rem;
+				text-align: center;
+				color: var(--vscode-descriptionForeground);
+				min-height: 120px;
+			}
+
+			.open-project-placeholder .message {
+				font-size: var(--vscode-font-size);
+				margin: 0;
+			}
+
+			.open-project-placeholder asl-button {
+				min-width: 180px;
+			}
 		`,
     ];
 
@@ -117,6 +138,9 @@ export class ASlAVDSelectorApp extends ASlElement {
 
     @state()
     private logcatActive: boolean = false;
+
+    @state()
+    private isAndroidProject: boolean = true;
 
     private vscode: any;
     private buildCancellationToken: string | null = null;
@@ -276,8 +300,19 @@ export class ASlAVDSelectorApp extends ASlElement {
                     this.logcatActive = active;
                 }
                 break;
+            case 'update-android-project-state':
+                if (typeof message.params?.isAndroidProject === 'boolean') {
+                    this.isAndroidProject = message.params.isAndroidProject;
+                }
+                break;
         }
     };
+
+    private handleOpenFolderClick() {
+        if (this.vscode) {
+            this.vscode.postMessage({ type: 'open-folder' });
+        }
+    }
 
     override connectedCallback() {
         super.connectedCallback();
@@ -320,6 +355,9 @@ export class ASlAVDSelectorApp extends ASlElement {
                         this.selectedModule = this.modules[0].module;
                     }
                 }
+                if (typeof bootstrap?.isAndroidProject === 'boolean') {
+                    this.isAndroidProject = bootstrap.isAndroidProject;
+                }
             } catch (e) {
                 console.error('Failed to parse bootstrap data:', e);
             }
@@ -337,6 +375,22 @@ export class ASlAVDSelectorApp extends ASlElement {
     }
 
     override render() {
+        if (!this.isAndroidProject) {
+            return html`
+				<div class="container">
+					<h2 class="section-title">Android Studio Lite</h2>
+					<div class="open-project-placeholder">
+						<p class="message">Open an Android project to run and debug apps.</p>
+						<asl-button
+							label="Open Folder"
+							variant="primary"
+							@button-click=${this.handleOpenFolderClick}
+						></asl-button>
+					</div>
+				</div>
+			`;
+        }
+
         return html`
 			<div class="container">
 				<h2 class="section-title">Android Studio Lite</h2>

@@ -25,6 +25,9 @@ export class BuildVariantTreeView {
         const subscriptions: vscode.Disposable[] = [
             view,
             vscode.commands.registerCommand('android-studio-lite.buildvariant-refresh', this.refresh),
+            vscode.commands.registerCommand('android-studio-lite.openAndroidProject', () => {
+                void vscode.commands.executeCommand('workbench.action.files.openFolder');
+            }),
 
             vscode.commands.registerCommand('android-studio-lite.buildvariant-select', async (node) => {
                 let moduleName: string | undefined;
@@ -38,6 +41,13 @@ export class BuildVariantTreeView {
                 await this.selectBuildVariant(moduleName);
             }),
         ];
+
+        // Refresh when workspace folders change (e.g. user opened a folder)
+        subscriptions.push(
+            vscode.workspace.onDidChangeWorkspaceFolders(() => {
+                this.provider.refresh();
+            }),
+        );
 
         // Add file watcher to subscriptions if it exists
         if (this.fileWatcher) {
@@ -150,7 +160,7 @@ export class BuildVariantTreeView {
     }
 }
 
-type TreeItem = BuildVariantTreeItem;
+type TreeItem = BuildVariantTreeItem | OpenAndroidProjectTreeItem;
 
 class BuildVariantTreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     constructor(
@@ -163,6 +173,10 @@ class BuildVariantTreeDataProvider implements vscode.TreeDataProvider<TreeItem> 
     }
 
     async getChildren(element?: TreeItem): Promise<TreeItem[]> {
+        if (!this.manager.buildVariant.isAndroidProject()) {
+            return [new OpenAndroidProjectTreeItem()];
+        }
+
         try {
             const modules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
 
@@ -203,6 +217,20 @@ class BuildVariantTreeDataProvider implements vscode.TreeDataProvider<TreeItem> 
     refresh(): void {
         this._onDidChangeTreeData.fire();
     }
+}
+
+/** Shown when workspace is not an Android project; runs Open Folder on click. */
+class OpenAndroidProjectTreeItem extends vscode.TreeItem {
+    constructor() {
+        super('Open an Android project', vscode.TreeItemCollapsibleState.None);
+        this.tooltip = 'Open a folder containing an Android project (with gradlew)';
+        this.iconPath = new vscode.ThemeIcon('folder-opened');
+        this.command = {
+            command: 'android-studio-lite.openAndroidProject',
+            title: 'Open Folder',
+        };
+    }
+    contextValue = 'openAndroidProject';
 }
 
 export class BuildVariantTreeItem extends vscode.TreeItem {

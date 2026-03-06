@@ -202,6 +202,12 @@
         "command": "android-studio-lite.buildvariant-refresh",
         "title": "Refresh Build Variants",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "android-studio-lite.openAndroidProject",
+        "title": "Open an Android project",
+        "category": "Android Studio Lite",
+        "icon": "$(folder-opened)"
       }
     ],
     "menus": {

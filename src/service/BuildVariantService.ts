@@ -53,6 +53,13 @@ export class BuildVariantService extends Service {
         this.workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     }
 
+    /** True if the current workspace has a Gradle wrapper (Android/Gradle project). */
+    public isAndroidProject(): boolean {
+        const wp = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+        if (!wp) return false;
+        return AndroidSdkDetector.checkGradleWrapper(wp).exists;
+    }
+
     public async getModuleBuildVariants(context: vscode.ExtensionContext): Promise<MuduleBuildVariant[]> {
         let out = this.getCache("getModuleBuildVariants");
         if (out) {

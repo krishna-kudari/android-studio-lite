@@ -1,5 +1,5 @@
 import type { Disposable, ExtensionContext } from 'vscode';
-import { Disposable as VSCodeDisposable, window, commands, ProgressLocation, CancellationTokenSource } from 'vscode';
+import { Disposable as VSCodeDisposable, window, commands, workspace, ProgressLocation, CancellationTokenSource } from 'vscode';
 import type { WebviewProvider, WebviewHost } from './webviewProvider.js';
 import type { WebviewState } from './protocol.js';
 import { Manager } from '../core';
@@ -11,6 +11,8 @@ export interface AVDSelectorWebviewState extends WebviewState {
     selectedAVD?: string;
     modules?: MuduleBuildVariant[];
     selectedModule?: string;
+    /** When false, show "Open an Android project" placeholder. */
+    isAndroidProject?: boolean;
 }
 
 export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewState> {
@@ -24,6 +26,17 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         private readonly context: ExtensionContext
     ) {
         this.manager = Manager.getInstance();
+        this.disposables.push(
+            workspace.onDidChangeWorkspaceFolders(async () => {
+                const isAndroidProject = this.manager.buildVariant.isAndroidProject();
+                await this.host.notify('update-android-project-state', {
+                    isAndroidProject,
+                });
+                if (isAndroidProject) {
+                    await this.sendModules();
+                }
+            }),
+        );
     }
 
     getTelemetryContext(): Record<string, string | number | boolean | undefined> {
@@ -38,13 +51,17 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         const avdList = avds || [];
         const selectedAVD = avdList.length > 0 ? avdList[0].name : undefined;
 
-        // Get modules and filter for application type
+        const isAndroidProject = this.manager.buildVariant.isAndroidProject();
+
+        // Get modules and filter for application type (only when Android project)
         let modules: MuduleBuildVariant[] = [];
-        try {
-            const allModules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
-            modules = allModules.filter(m => m.type === 'application');
-        } catch (error) {
-            console.error('[AVDSelectorProvider] Error loading modules:', error);
+        if (isAndroidProject) {
+            try {
+                const allModules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
+                modules = allModules.filter(m => m.type === 'application');
+            } catch (error) {
+                console.error('[AVDSelectorProvider] Error loading modules:', error);
+            }
         }
         const selectedModule = modules.length > 0 ? modules[0].module : undefined;
 
@@ -63,6 +80,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
             selectedAVD,
             modules,
             selectedModule,
+            isAndroidProject,
         };
     }
 
@@ -76,6 +94,10 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     }
 
     onMessageReceived?(e: any): void {
+        if (e.type === 'open-folder') {
+            void commands.executeCommand('workbench.action.files.openFolder');
+            return;
+        }
         if (e.type === 'refresh-avds') {
             void this.sendAVDList();
         } else if (e.type === 'refresh-modules') {
