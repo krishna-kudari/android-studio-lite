@@ -561,6 +561,10 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
     }
 
     private async sendModules(): Promise<void> {
+        if (!this.manager.buildVariant.isAndroidProject()) {
+            await this.host.notify('update-modules', { modules: [] });
+            return;
+        }
         try {
             const allModules = await this.manager.buildVariant.getModuleBuildVariants(this.context);
             const modules = allModules.filter(m => m.type === 'application');

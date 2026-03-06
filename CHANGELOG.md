@@ -2,6 +2,22 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.8] - 2026-03-06
+
+### Added
+- **Kotlin import folding:** `editor.foldingImportsByDefault` now works for `.kt` files. Added a `FoldingRangeProvider` that marks the import block with `FoldingRangeKind.Imports` so VS Code can auto-fold it (activation: `onLanguage:kotlin`).
+- **"Open an Android project" placeholder:** When the workspace is not an Android project (no Gradle wrapper), the Android Studio Lite webview and Build Variant section show an "Open an Android project" message with an "Open Folder" button (same behavior as File → Open Folder). AVD section is unchanged and always shown.
+- **Emulator boot service:** Run flow now uses fire-and-forget emulator spawn (`detached: true`, `stdio: 'ignore'`, `unref()`) so the extension no longer hangs waiting for the emulator process. ADB polling runs in parallel to detect when the device is fully booted before building/installing.
+
+### Fixed
+- **Module config fetched twice:** Coalesced concurrent `getModuleBuildVariants` calls so multiple callers (bootstrap, onReady, refresh-modules) share a single in-flight promise and Gradle is only run once.
+- **Webview reload on activity bar switch:** Set `retainContextWhenHidden: true` for webview views so the Android Studio Lite panel no longer reloads when switching between Git, Explorer, and Android Studio Lite.
+- **Run stuck on "Starting emulator...":** Emulator process is no longer awaited; serial is resolved by AVD name (`adb devices -l` / `adb emu avd name`), then we wait for `sys.boot_completed` and `init.svc.bootanim` on that serial before running the Gradle install and launching the app.
+- **Gradle error on non-Android project:** Opening a non-Android project no longer shows "Gradle wrapper (gradlew) not found…". `sendModules()` now skips calling Gradle when the workspace is not an Android project and sends an empty module list instead.
+
+### Changed
+- Run-app flow: launch and boot wait are handled by `EmulatorBootService.launchAndWait()` (spawn then poll ADB). Resolved ADB serial is used for install/launch when multiple emulators are present.
+
 ## [0.0.7] - 2025-03-06
 
 ### Fixed
