@@ -6,11 +6,19 @@ import { subscribe } from './module/';
 import { WebviewsController } from './webviews/webviewsController';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
 
-// Import logcat commands and provider from compiled output
-const logcatCommands = require('../out/commands/logcatCommands');
-const LogcatProvider = require('../out/providers/logcatProvider').LogcatProvider;
-const DeviceService = require('../out/services/deviceService').DeviceService;
-const AdbService = require('../out/services/adbService').AdbService;
+// Optional: logcat modules (present in 0.0.2 VSIX; missing when building from v0.0.3 tag - no src/commands, src/providers, src/services)
+let logcatCommands: any = null;
+let LogcatProvider: any = null;
+let DeviceService: any = null;
+let AdbService: any = null;
+try {
+    logcatCommands = require('../out/commands/logcatCommands');
+    LogcatProvider = require('../out/providers/logcatProvider').LogcatProvider;
+    DeviceService = require('../out/services/deviceService').DeviceService;
+    AdbService = require('../out/services/adbService').AdbService;
+} catch {
+    // Expected when out/commands, out/providers, out/services are not built (e.g. VSIX from v0.0.3 tag)
+}
 
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
@@ -42,19 +50,19 @@ export async function activate(context: vscode.ExtensionContext) {
 	new BuildVariantTreeView(context, manager);
 	console.log("build variant loaded");
 
-	// Initialize logcat services
+	// Initialize logcat services (only if optional modules are present)
 	let logcatProvider: any = null;
-	try {
-		const adbService = new AdbService(context);
-		// Initialize ADB path asynchronously (it's async but constructor doesn't await)
-		await adbService.initializeAdbPath();
-		const deviceService = new DeviceService(adbService, context, () => {});
-		logcatProvider = new LogcatProvider(deviceService, adbService, manager.gradle);
-		console.log("logcat services initialized");
-	} catch (error) {
-		console.error("Failed to initialize logcat services:", error);
+	if (AdbService && DeviceService && LogcatProvider && logcatCommands) {
+		try {
+			const adbService = new AdbService(context);
+			await adbService.initializeAdbPath();
+			const deviceService = new DeviceService(adbService, context, () => {});
+			logcatProvider = new LogcatProvider(deviceService, adbService, manager.gradle);
+			console.log("logcat services initialized");
+		} catch (error) {
+			console.error("Failed to initialize logcat services:", error);
+		}
 	}
-
 	// Register commands
 	subscribe(context, [
 		vscode.commands.registerCommand('android-studio-lite.setup-wizard', async () => {

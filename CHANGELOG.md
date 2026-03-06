@@ -2,6 +2,11 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.7] - 2025-03-06
+
+### Fixed
+- Extension no longer fails to activate when `out/commands`, `out/providers`, or `out/services` are missing (e.g. when building VSIX from a tag without those sources). Logcat modules are loaded optionally; logcat commands show a message when logcat is unavailable.
+
 ## [0.0.3] - 2025-01-12
 
 ### Added
