@@ -6,6 +6,7 @@ import { Manager } from '../core';
 import type { AVD } from '../cmd/AVDManager';
 import type { MuduleBuildVariant } from '../service/BuildVariantService';
 import { EmulatorBootService } from '../device/EmulatorBootService.js';
+import { LogcatService } from '../service/LogcatService.js';
 
 export interface AVDSelectorWebviewState extends WebviewState {
     avds?: AVD[];
@@ -14,6 +15,8 @@ export interface AVDSelectorWebviewState extends WebviewState {
     selectedModule?: string;
     /** When false, show "Open an Android project" placeholder. */
     isAndroidProject?: boolean;
+    /** When false, logcat modules are not available; hide Logcat toggle. */
+    logcatAvailable?: boolean;
 }
 
 export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewState> {
@@ -24,7 +27,8 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
 
     constructor(
         private readonly host: WebviewHost,
-        private readonly context: ExtensionContext
+        private readonly context: ExtensionContext,
+        private readonly logcatAvailable: boolean = false,
     ) {
         this.manager = Manager.getInstance();
         this.disposables.push(
@@ -82,6 +86,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
             modules,
             selectedModule,
             isAndroidProject,
+            logcatAvailable: this.logcatAvailable,
         };
     }
 
@@ -228,6 +233,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                                 throw new Error(`No applicationId found for variant ${variantName}. Please ensure the gradle script includes applicationId for application modules.`);
                             }
                             await this.launchApp(applicationId, serial);
+                            LogcatService.setLastRun(this.context, applicationId, serial);
                             progress.report({ increment: 100, message: 'App launched successfully!' });
                             window.showInformationMessage(`App installed and launched on ${avdName}`);
                         } catch (launchError: any) {

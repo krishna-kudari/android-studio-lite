@@ -6,20 +6,7 @@ import { subscribe } from './module/';
 import { WebviewsController } from './webviews/webviewsController';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
 import { KotlinImportFoldingProvider } from './language/KotlinImportFoldingProvider';
-
-// Optional: logcat modules (present in 0.0.2 VSIX; missing when building from v0.0.3 tag - no src/commands, src/providers, src/services)
-let logcatCommands: any = null;
-let LogcatProvider: any = null;
-let DeviceService: any = null;
-let AdbService: any = null;
-try {
-    logcatCommands = require('../out/commands/logcatCommands');
-    LogcatProvider = require('../out/providers/logcatProvider').LogcatProvider;
-    DeviceService = require('../out/services/deviceService').DeviceService;
-    AdbService = require('../out/services/adbService').AdbService;
-} catch {
-    // Expected when out/commands, out/providers, out/services are not built (e.g. VSIX from v0.0.3 tag)
-}
+import { LogcatService } from './service/LogcatService';
 
 export async function activate(context: vscode.ExtensionContext) {
 	console.log('Android Studio Lite extension is now active!');
@@ -36,6 +23,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		),
 	);
 
+	// Logcat: built-in service with its own output channel (logs for last-run app only)
+	const logcatService = new LogcatService(manager, context);
+
 	// Register AVD Selector webview view using new architecture
 	const webviewsController = new WebviewsController(context);
 	context.subscriptions.push(webviewsController);
@@ -47,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				fileName: 'avdSelector.html',
 				title: 'Android Studio Lite',
 			},
-			async (host) => new AVDSelectorProvider(host, context),
+			async (host) => new AVDSelectorProvider(host, context, true),
 		)
 	);
 
@@ -59,19 +49,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	new BuildVariantTreeView(context, manager);
 	console.log("build variant loaded");
 
-	// Initialize logcat services (only if optional modules are present)
-	let logcatProvider: any = null;
-	if (AdbService && DeviceService && LogcatProvider && logcatCommands) {
-		try {
-			const adbService = new AdbService(context);
-			await adbService.initializeAdbPath();
-			const deviceService = new DeviceService(adbService, context, () => {});
-			logcatProvider = new LogcatProvider(deviceService, adbService, manager.gradle);
-			console.log("logcat services initialized");
-		} catch (error) {
-			console.error("Failed to initialize logcat services:", error);
-		}
-	}
 	// Register commands
 	subscribe(context, [
 		vscode.commands.registerCommand('android-studio-lite.setup-wizard', async () => {
@@ -89,84 +66,25 @@ export async function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('android-studio-lite.setup-emulator', async () => {
 			await manager.android.updatePathDiag("file", ConfigItem.emulator, "Please select the Emulator Path", "Emulator path updated!", "Emulator path not specified!");
 		}),
-		// Register logcat commands
 		vscode.commands.registerCommand('android-studio-lite.startLogcat', async () => {
-			if (!logcatProvider) {
-				vscode.window.showErrorMessage('Logcat services not initialized');
-				return;
-			}
-
-			// Get device service from logcat provider
-			const deviceService = (logcatProvider as any).deviceService;
-			if (!deviceService) {
-				vscode.window.showErrorMessage('Device service not available');
-				return;
-			}
-
-			// Check if device is selected, if not try to auto-select first available device
-			let selectedDevice = deviceService.getSelectedDevice();
-			if (!selectedDevice) {
-				const devices = deviceService.getDevices();
-				const onlineDevices = devices.filter((d: any) => d.status === 'device');
-
-				if (onlineDevices.length === 0) {
-					vscode.window.showWarningMessage(
-						'No online devices found. Please connect a device or start an emulator first.',
-						'OK'
-					);
-					return;
-				}
-
-				// Auto-select first online device
-				try {
-					await deviceService.selectDevice(onlineDevices[0].id);
-					selectedDevice = deviceService.getSelectedDevice();
-					if (selectedDevice) {
-						vscode.window.showInformationMessage(`Auto-selected device: ${selectedDevice.name || selectedDevice.id}`);
-					}
-				} catch (error: any) {
-					vscode.window.showErrorMessage(`Failed to select device: ${error.message || String(error)}`);
-					return;
-				}
-			}
-
-			// Start logcat
-			await logcatCommands.startLogcatCommand(logcatProvider);
+			await logcatService.start();
 		}),
-		vscode.commands.registerCommand('android-studio-lite.stopLogcat', async () => {
-			if (logcatProvider) {
-				logcatCommands.stopLogcatCommand(logcatProvider);
-			} else {
-				vscode.window.showErrorMessage('Logcat services not initialized');
-			}
+		vscode.commands.registerCommand('android-studio-lite.stopLogcat', () => {
+			logcatService.stop();
 		}),
-		vscode.commands.registerCommand('android-studio-lite.pauseLogcat', async () => {
-			if (logcatProvider) {
-				logcatCommands.pauseLogcatCommand(logcatProvider);
-			} else {
-				vscode.window.showErrorMessage('Logcat services not initialized');
-			}
+		vscode.commands.registerCommand('android-studio-lite.pauseLogcat', () => {
+			// Pause = stop for this simple implementation
+			logcatService.stop();
 		}),
 		vscode.commands.registerCommand('android-studio-lite.resumeLogcat', async () => {
-			if (logcatProvider) {
-				logcatCommands.resumeLogcatCommand(logcatProvider);
-			} else {
-				vscode.window.showErrorMessage('Logcat services not initialized');
-			}
+			await logcatService.start();
 		}),
-		vscode.commands.registerCommand('android-studio-lite.clearLogcat', async () => {
-			if (logcatProvider) {
-				logcatCommands.clearLogcatCommand(logcatProvider);
-			} else {
-				vscode.window.showErrorMessage('Logcat services not initialized');
-			}
+		vscode.commands.registerCommand('android-studio-lite.clearLogcat', () => {
+			logcatService.clear();
 		}),
 		vscode.commands.registerCommand('android-studio-lite.setLogLevel', async () => {
-			if (logcatProvider) {
-				await logcatCommands.setLogLevelCommand(logcatProvider);
-			} else {
-				vscode.window.showErrorMessage('Logcat services not initialized');
-			}
+			logcatService.show();
+			vscode.window.showInformationMessage('Filter by log level is not available. Logcat shows all levels for the running app.');
 		}),
 	]);
 

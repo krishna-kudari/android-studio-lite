@@ -140,6 +140,9 @@ export class ASlAVDSelectorApp extends ASlElement {
     private logcatActive: boolean = false;
 
     @state()
+    private logcatAvailable: boolean = false;
+
+    @state()
     private isAndroidProject: boolean = true;
 
     private vscode: any;
@@ -278,6 +281,9 @@ export class ASlAVDSelectorApp extends ASlElement {
                             this.selectedModule = this.modules[0].module;
                         }
                     }
+                    if (typeof state.logcatAvailable === 'boolean') {
+                        this.logcatAvailable = state.logcatAvailable;
+                    }
                 }
                 break;
             case 'build-started':
@@ -358,6 +364,9 @@ export class ASlAVDSelectorApp extends ASlElement {
                 if (typeof bootstrap?.isAndroidProject === 'boolean') {
                     this.isAndroidProject = bootstrap.isAndroidProject;
                 }
+                if (typeof bootstrap?.logcatAvailable === 'boolean') {
+                    this.logcatAvailable = bootstrap.logcatAvailable;
+                }
             } catch (e) {
                 console.error('Failed to parse bootstrap data:', e);
             }
@@ -429,11 +438,13 @@ export class ASlAVDSelectorApp extends ASlElement {
 						?disabled=${!this.buildCancellable}
 						@button-click=${this.handleCancelClick}
 					></asl-button>
-					<asl-toggle-button
-						label="Logcat"
-						?checked=${this.logcatActive}
-						@toggle-click=${this.handleLogcatToggle}
-					></asl-toggle-button>
+					${this.logcatAvailable
+						? html`<asl-toggle-button
+								label="Logcat"
+								?checked=${this.logcatActive}
+								@toggle-click=${this.handleLogcatToggle}
+							></asl-toggle-button>`
+						: ''}
 				</div>
 			</div>
 		`;
