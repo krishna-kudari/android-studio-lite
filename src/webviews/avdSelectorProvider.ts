@@ -5,6 +5,7 @@ import type { WebviewState } from './protocol.js';
 import { Manager } from '../core';
 import type { AVD } from '../cmd/AVDManager';
 import type { MuduleBuildVariant } from '../service/BuildVariantService';
+import { EmulatorBootService } from '../device/EmulatorBootService.js';
 
 export interface AVDSelectorWebviewState extends WebviewState {
     avds?: AVD[];
@@ -137,11 +138,10 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         try {
             await this.host.notify('build-started', { cancellationToken });
 
-            // Check if AVD is running, boot if not
-            await this.ensureAVDRunning(avdName, cancelToken.token);
-
-            if (cancelToken.token.isCancellationRequested) {
-                await this.host.notify('build-cancelled', {});
+            const adbPath = this.getAdbPath();
+            const emulatorPath = this.manager.android.getEmulator();
+            if (!adbPath || !emulatorPath) {
+                await this.host.notify('build-failed', { error: 'SDK path or emulator not configured. Run Setup Wizard.' });
                 return;
             }
 
@@ -184,6 +184,22 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                     });
 
                     try {
+                        // Fire-and-forget launch (if needed) + ADB poll until fully booted
+                        const bootService = new EmulatorBootService(
+                            adbPath,
+                            emulatorPath,
+                            { appendLine: (line) => this.manager.output.append(line) },
+                        );
+                        const serial = await bootService.launchAndWait(
+                            avdName,
+                            progress,
+                            cancelToken.token,
+                        );
+
+                        if (cancelToken.token.isCancellationRequested) {
+                            throw new Error('Build was cancelled');
+                        }
+
                         progress.report({ increment: 0, message: `Installing ${installTask}...` });
                         console.log(`[AVDSelectorProvider] Starting gradle install task: ${installTask}`);
 
@@ -211,7 +227,7 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
                             if (!applicationId) {
                                 throw new Error(`No applicationId found for variant ${variantName}. Please ensure the gradle script includes applicationId for application modules.`);
                             }
-                            await this.launchApp(applicationId);
+                            await this.launchApp(applicationId, serial);
                             progress.report({ increment: 100, message: 'App launched successfully!' });
                             window.showInformationMessage(`App installed and launched on ${avdName}`);
                         } catch (launchError: any) {
@@ -367,28 +383,25 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         }
     }
 
-    private async launchApp(applicationId: string): Promise<void> {
-        // Get the first available emulator device
+    private async launchApp(applicationId: string, serial?: string): Promise<void> {
         const config = this.manager.getConfig();
         const sdkPath = config.sdkPath;
         if (!sdkPath) {
             throw new Error('SDK path not configured');
         }
 
-        const { exec } = await import('child_process');
-        const { promisify } = await import('util');
-        const execAsync = promisify(exec);
         const path = await import('path');
-
         const platformToolsPath = path.join(sdkPath, 'platform-tools');
         const adbPath = path.join(platformToolsPath, process.platform === 'win32' ? 'adb.exe' : 'adb');
 
         console.log(`[AVDSelectorProvider] Launching app with applicationId: ${applicationId}`);
 
-        // Launch app using monkey command (simpler and more reliable)
-        // This will launch the main activity
-        const launchCommand = `"${adbPath}" shell monkey -p ${applicationId} -c android.intent.category.LAUNCHER 1`;
+        const serialArg = serial ? `-s ${serial} ` : '';
+        const launchCommand = `"${adbPath}" ${serialArg}shell monkey -p ${applicationId} -c android.intent.category.LAUNCHER 1`;
         try {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
             const result = await execAsync(launchCommand);
             console.log(`[AVDSelectorProvider] App launch command output: ${result.stdout}`);
         } catch (error: any) {
@@ -487,54 +500,49 @@ export class AVDSelectorProvider implements WebviewProvider<AVDSelectorWebviewSt
         return errorMessage;
     }
 
-    private async checkIfAVDRunning(avdName: string): Promise<boolean> {
+    /** Returns the first running emulator serial (e.g. "emulator-5554") or null. */
+    private async getRunningEmulatorSerial(): Promise<string | null> {
         try {
-            // Use ADB to check if device is online
-            // Get platform tools path from Manager's config (more reliable)
-            const config = this.manager.getConfig();
-            const sdkPath = config.sdkPath;
-
-            if (!sdkPath) {
-                console.log('[AVDSelectorProvider] No SDK path configured, assuming AVD is not running');
-                return false;
-            }
+            const adbPath = this.getAdbPath();
+            if (!adbPath) return null;
 
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
-            const path = await import('path');
-
-            // ADB is in platform-tools directory
-            const platformToolsPath = path.join(sdkPath, 'platform-tools');
-            const adbPath = path.join(platformToolsPath, process.platform === 'win32' ? 'adb.exe' : 'adb');
 
             const result = await execAsync(`"${adbPath}" devices`);
             const output = result.stdout;
 
-            // Check if any emulator device is online
-            // If any emulator is online, we assume the AVD is running
-            // (We can't directly match AVD name to device ID without additional ADB commands)
-            const lines = output.split('\n').filter(line => {
+            const lines = output.split('\n').filter((line: string) => {
                 const trimmed = line.trim();
                 return trimmed && !trimmed.startsWith('List of devices');
             });
 
             for (const line of lines) {
-                // Check if line contains an emulator device that's online
-                // Format: "emulator-5554    device" or "emulator-5554	device"
                 const parts = line.trim().split(/\s+/);
                 if (parts.length >= 2 && parts[0].startsWith('emulator-') && parts[1] === 'device') {
                     console.log(`[AVDSelectorProvider] Found running emulator device: ${parts[0]}`);
-                    return true;
+                    return parts[0];
                 }
             }
-            console.log('[AVDSelectorProvider] No running emulator devices found');
-            return false;
-        } catch (error) {
-            console.error('[AVDSelectorProvider] Error checking device status:', error);
-            // If we can't check, assume it's not running to be safe
-            return false;
+            return null;
+        } catch {
+            return null;
         }
+    }
+
+    private getAdbPath(): string | null {
+        const config = this.manager.getConfig();
+        const sdkPath = config.sdkPath;
+        if (!sdkPath) return null;
+        const path = require('path');
+        const platformToolsPath = path.join(sdkPath, 'platform-tools');
+        return path.join(platformToolsPath, process.platform === 'win32' ? 'adb.exe' : 'adb');
+    }
+
+    private async checkIfAVDRunning(_avdName: string): Promise<boolean> {
+        const serial = await this.getRunningEmulatorSerial();
+        return serial !== null;
     }
 
     async onRefresh?(force?: boolean): Promise<void> {
