@@ -43,6 +43,9 @@ export class BuildVariantService extends Service {
     readonly buildVariant: BuildVariantExecutable;
     readonly workspacePath: string;
 
+    /** Coalesces concurrent getModuleBuildVariants calls to avoid duplicate Gradle fetches */
+    private moduleBuildVariantsPromise: Promise<MuduleBuildVariant[]> | null = null;
+
     constructor(manager: Manager) {
         super(manager);
         this.manager = manager;
@@ -52,7 +55,22 @@ export class BuildVariantService extends Service {
 
     public async getModuleBuildVariants(context: vscode.ExtensionContext): Promise<MuduleBuildVariant[]> {
         let out = this.getCache("getModuleBuildVariants");
-        if (!out) {
+        if (out) {
+            return out;
+        }
+
+        // Coalesce concurrent calls - return the in-flight promise if one exists
+        if (this.moduleBuildVariantsPromise) {
+            return this.moduleBuildVariantsPromise;
+        }
+
+        this.moduleBuildVariantsPromise = this.fetchModuleBuildVariants(context).finally(() => {
+            this.moduleBuildVariantsPromise = null;
+        });
+        return this.moduleBuildVariantsPromise;
+    }
+
+    private async fetchModuleBuildVariants(context: vscode.ExtensionContext): Promise<MuduleBuildVariant[]> {
             // Check if gradlew exists before attempting to run
             if (!this.workspacePath) {
                 showMsg(MsgType.warning, "No workspace folder found. Please open an Android project folder.");
@@ -106,9 +124,9 @@ export class BuildVariantService extends Service {
                         variants: moduleData.variants,
                     });
                 });
-                out = variants;
                 // Cache for 5 minutes (300 seconds)
-                this.setCache("getModuleBuildVariants", out, 300);
+                this.setCache("getModuleBuildVariants", variants, 300);
+                return variants;
             } catch (error: any) {
                 fs.unlinkSync(initScriptPath);
                 const errorMessage = error?.message || String(error);
@@ -127,13 +145,13 @@ export class BuildVariantService extends Service {
                 }
                 return defaultVariants;
             }
-        }
-        return out;
     }
 
     public clearCache(): void {
         // Force expire the cache by setting it with expired timestamp
         this.manager.cache.set("getModuleBuildVariants", null, -1);
+        // Clear coalesced promise so next call triggers a fresh fetch
+        this.moduleBuildVariantsPromise = null;
     }
 
     private getInitScriptPath(context: vscode.ExtensionContext) {
