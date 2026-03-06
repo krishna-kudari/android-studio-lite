@@ -5,6 +5,7 @@ import { Manager, ConfigItem } from './core';
 import { subscribe } from './module/';
 import { WebviewsController } from './webviews/webviewsController';
 import { AVDSelectorProvider } from './webviews/avdSelectorProvider';
+import { KotlinImportFoldingProvider } from './language/KotlinImportFoldingProvider';
 
 // Optional: logcat modules (present in 0.0.2 VSIX; missing when building from v0.0.3 tag - no src/commands, src/providers, src/services)
 let logcatCommands: any = null;
@@ -26,6 +27,14 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Initialize Manager (core singleton)
 	const manager = Manager.getInstance();
 	await manager.android.initCheck();
+
+	// Kotlin: provide import folding ranges so editor.foldingImportsByDefault works
+	context.subscriptions.push(
+		vscode.languages.registerFoldingRangeProvider(
+			{ language: 'kotlin' },
+			new KotlinImportFoldingProvider(),
+		),
+	);
 
 	// Register AVD Selector webview view using new architecture
 	const webviewsController = new WebviewsController(context);
