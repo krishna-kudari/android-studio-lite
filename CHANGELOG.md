@@ -2,6 +2,19 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.9] - 2026-03-06
+
+### Added
+- **Built-in Logcat:** Logcat is now implemented in the extension (no optional `out/` modules). A dedicated "Logcat" output channel shows logs only for the app you last ran (filtered by PID). Run the app from the AVD selector, then turn on the Logcat toggle to stream that app’s logs.
+- **Last-run persistence:** After a successful Run, the extension stores the app’s applicationId and device serial so Logcat can target the same app and device when you start it.
+
+### Changed
+- **Logcat architecture:** Removed all optional `require()` of `out/commands`, `out/providers`, and `out/services`. Replaced with `LogcatService` in `src/service/LogcatService.ts` using Manager config (ADB path), workspace state (last-run app/device), and existing `logcatParser` for formatting. Start/stop/clear/setLogLevel commands now use this service.
+- **Logcat toggle:** Always visible in the AVD selector. Turning it on starts app-only logcat and shows the Logcat channel; turning it off stops the stream and shows the Android Studio Lite channel.
+
+### Fixed
+- "Logcat services not initialized" no longer appears; Logcat is always available in this build.
+
 ## [0.0.8] - 2026-03-06
 
 ### Added
