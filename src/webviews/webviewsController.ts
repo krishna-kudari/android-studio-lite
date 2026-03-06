@@ -71,7 +71,11 @@ export class WebviewsController implements Disposable {
                         }
                     },
                 },
-                descriptor.webviewHostOptions != null ? { webviewOptions: descriptor.webviewHostOptions } : undefined,
+                {
+                    webviewOptions: {
+                        retainContextWhenHidden: descriptor.webviewHostOptions?.retainContextWhenHidden ?? true,
+                    },
+                },
             ),
         );
 
