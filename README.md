@@ -3,13 +3,23 @@
 You ain't going back to android studio for a while.
 
 <p align="center">
-  <img src="assets/Extension_1.png" width="180" alt="Screenshot 1"/>
-  <img src="assets/Extension_2.png" width="180" alt="Screenshot 2"/>
-  <img src="assets/Extension_3.png" width="180" alt="Screenshot 3"/>
-  <img src="assets/Extension_4.png" width="180" alt="Screenshot 4"/>
-  <img src="assets/Extension_5.png" width="180" alt="Screenshot 5"/>
-  <img src="assets/Extension_6.png" width="180" alt="Screenshot 6"/>
-  <img src="assets/Extension_7.png" width="180" alt="Screenshot 7"/>
+  <table>
+    <tr>
+      <td><img src="assets/Extension_1.png" width="280" alt="Screenshot 1"/></td>
+      <td><img src="assets/Extension_2.png" width="280" alt="Screenshot 2"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/Extension_3.png" width="280" alt="Screenshot 3"/></td>
+      <td><img src="assets/Extension_4.png" width="280" alt="Screenshot 4"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/Extension_5.png" width="280" alt="Screenshot 5"/></td>
+      <td><img src="assets/Extension_6.png" width="280" alt="Screenshot 6"/></td>
+    </tr>
+    <tr>
+      <td colspan="2" align="center"><img src="assets/Extension_7.png" width="280" alt="Screenshot 7"/></td>
+    </tr>
+  </table>
 </p>
 
 ---
