@@ -2,6 +2,11 @@
 
 All notable changes to the "Android Studio Lite" extension will be documented in this file.
 
+## [0.0.10] - 2026-03-06
+
+### Changed
+- **Marketplace:** Added categories (Debuggers, Testing) and keywords (android, emulator, logcat, gradle, kotlin, etc.) for better discoverability and ranking.
+
 ## [0.0.9] - 2026-03-06
 
 ### Added

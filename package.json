@@ -2,7 +2,7 @@
   "name": "android-studio-lite",
   "displayName": "Android Studio Lite",
   "description": "Android Dev Companion for Cursor/VS Code - Device management and app lifecycle controls",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "publisher": "krishna-kudari",
   "repository": {
     "type": "git",
@@ -13,7 +13,24 @@
     "vscode": "^1.74.0"
   },
   "categories": [
+    "Debuggers",
+    "Testing",
     "Other"
+  ],
+  "keywords": [
+    "android",
+    "android studio",
+    "avd",
+    "emulator",
+    "logcat",
+    "gradle",
+    "kotlin",
+    "mobile",
+    "device",
+    "run",
+    "debug",
+    "build variant",
+    "adb"
   ],
   "activationEvents": [
     "onStartupFinished",
